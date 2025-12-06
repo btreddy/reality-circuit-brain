@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Node/React
+node_modules/
+build/
+dist/
+
+# Environment variables (Security)
+.env
+
+# OS generated files
+.DS_Store
+Thumbs.db

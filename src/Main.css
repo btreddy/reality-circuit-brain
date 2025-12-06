@@ -1,0 +1,125 @@
+/* Main.css - SCI-FI SCANNER THEME */
+:root {
+  --bg-color: #050505;
+  --terminal-green: #0aff0a;
+  --terminal-red: #ff2a2a;
+  --terminal-blue: #0acaff;
+  --glass-panel: rgba(20, 30, 20, 0.8);
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--terminal-green);
+  font-family: 'Courier New', Courier, monospace;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* THE SCANNER CONTAINER */
+.scanner-frame {
+  width: 100%;
+  max-width: 600px;
+  background: var(--glass-panel);
+  border: 1px solid var(--terminal-green);
+  box-shadow: 0 0 20px rgba(10, 255, 10, 0.2);
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* THE "SCAN LINE" ANIMATION */
+.scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--terminal-green);
+  box-shadow: 0 0 10px var(--terminal-green);
+  opacity: 0.5;
+  animation: scan 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scan {
+  0% { top: -10%; }
+  100% { top: 110%; }
+}
+
+/* TYPOGRAPHY */
+h1, h2 {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border-bottom: 1px dashed var(--terminal-green);
+  padding-bottom: 10px;
+  text-shadow: 0 0 5px var(--terminal-green);
+}
+
+p {
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+/* INPUTS AND BUTTONS */
+input[type="text"] {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--terminal-green);
+  color: var(--terminal-green);
+  padding: 15px;
+  font-family: inherit;
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  box-shadow: 0 0 10px var(--terminal-green);
+}
+
+.neon-btn {
+  background: transparent;
+  border: 1px solid var(--terminal-green);
+  color: var(--terminal-green);
+  padding: 15px;
+  width: 100%;
+  margin-bottom: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.neon-btn:hover {
+  background: var(--terminal-green);
+  color: #000;
+  box-shadow: 0 0 15px var(--terminal-green);
+}
+
+/* RESULTS SCREEN */
+.result-box {
+  border: 1px solid var(--terminal-blue);
+  padding: 20px;
+  margin-top: 20px;
+  background: rgba(10, 202, 255, 0.1);
+  color: var(--terminal-blue);
+}
+
+.risk-flag {
+  color: var(--terminal-red);
+  border-left: 3px solid var(--terminal-red);
+  padding-left: 10px;
+  margin: 5px 0;
+}
+
+/* BLINK ANIMATION */
+.blink {
+  animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {
+  50% { opacity: 0; }
+}
