@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import './App.css'; 
+import './Main.css'; 
 
 // 🚀 STANDALONE MODE: If running as EXE, this usually points to localhost
 // If you are testing the EXE, ensure app.py is running on port 5000
