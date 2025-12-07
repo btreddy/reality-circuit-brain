@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import google.generativeai as genai
@@ -6,121 +7,148 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# ==========================================
-# 🔑 PRODUCTION CONFIGURATION (Google Gemini)
-# ==========================================
-# 1. Tries to get key from Server Environment (Best Practice)
-# 2. Falls back to your specific key for local testing
+# --- CONFIGURATION ---
+# Pull the API key from the environment only. DO NOT hardcode API keys in source.
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "AIzaSyDbOz5XrF4XlKfXWetgdDjpbqIYpEiKQ_U")
-
 genai.configure(api_key=GOOGLE_API_KEY)
+if not GOOGLE_API_KEY:
+    print("WARNING: GOOGLE_API_KEY is not set in the environment. Model calls will fail until a valid key is configured in the host (Render environment variables). Remove any hardcoded keys from source and the repo history.")
 
-# Use "gemini-1.5-pro" for best reasoning logic
-model = genai.GenerativeModel('gemini-1.5-pro')
+# Attempt to detect available models and pick the best-supported Gemini model.
+# This avoids deploying code that requests an unavailable model name (causing 404s).
+preferred_models = [
+    'gemini-2.0-flash',
+    'gemini-2.0',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro'
+]
+model = None
+chosen = None
+try:
+    available = genai.list_models()
+    model_names = []
+    for m in available:
+        # accommodate different return shapes
+        if isinstance(m, dict):
+            name = m.get('name') or m.get('id')
+        else:
+            name = getattr(m, 'name', None) or str(m)
+        model_names.append(name)
 
-# ==========================================
-# 🧠 THE SCIENTIFIC FRAMEWORK (Your PDF Logic)
-# ==========================================
-THINKING_FRAMEWORK = """
-REFERENCE DOCUMENT: 'The Thinking Processes in Humans and AI'
+    print(f"Available models: {model_names}")
+    for pref in preferred_models:
+        if any(pref in (n or '') for n in model_names):
+            model = genai.GenerativeModel(pref)
+            chosen = pref
+            break
+    if model is None:
+        # fallback to preferred first choice; may still error but we will catch later
+        chosen = preferred_models[0]
+        model = genai.GenerativeModel(chosen)
+except Exception as e:
+    print(f"Could not list models (will try default). Error: {e}")
+    chosen = preferred_models[0]
+    model = genai.GenerativeModel(chosen)
 
-PHASE 1: HUMAN THINKING FACTORS
-1. Biological: Neuroplasticity, age, and physical state (fatigue/hunger) impact focus (Ego Depletion).
-2. Cognitive: Memory, attention, and BIASES (confirmation bias) skew judgment.
-3. Emotional: Mood (stress/urgency) alters risk assessment.
-4. Social: Social interactions and peer feedback are required for grounded thinking.
+print(f"Configured model: {chosen} (GOOGLE_API_KEY set: {'YES' if GOOGLE_API_KEY else 'NO'})")
 
-PHASE 2: AI/FEASIBILITY FACTORS
-1. Data Quality: Biased or incomplete data leads to flawed outputs (GIGO).
-2. Resource/Computational: Limited by hardware (money/energy) and efficiency.
-3. Environmental Context: Static datasets (plans on paper) fail in dynamic real-world environments.
-
-KEY TAKEAWAY:
-A Grounded Idea must pass BOTH filters.
-"""
-
-# ==========================================
-# ⚙️ LOGIC ENGINE (Calculates Score)
-# ==========================================
-def calculate_grounded_score(physical, social, emotional, motivation):
+# --- LOGIC ENGINE (Human Filters) ---
+def calculate_human_score(physical, social, emotional, motivation):
     score = 100
     flags = []
     
     if physical in ['tired', 'hungry', 'sick']:
         score -= 25
         flags.append("Biological Risk: Physical State (Fatigue/Hunger)")
-
     if social == 'none':
         score -= 20
-        flags.append("Cognitive Risk: Lack of Peer Feedback (Echo Chamber)")
-
+        flags.append("Cognitive Risk: Echo Chamber (No Feedback)")
     if emotional == 'urgency':
         score -= 20
-        flags.append("Emotional Risk: Urgency/Stress State")
-
+        flags.append("Emotional Risk: Urgency Bias")
     if motivation == 'extrinsic':
         score -= 10
-        flags.append("Motivation Risk: Extrinsic Drivers (Money/Hype)")
+        flags.append("Motivation Risk: Extrinsic Drivers")
 
-    return {'score': max(score, 0), 'flags': flags}
+    return max(score, 0), flags
 
-# ==========================================
-# 🤖 INTELLIGENCE LAYER (Gemini Analysis)
-# ==========================================
-def generate_scientific_analysis(score, flags, user_idea):
+# --- INTELLIGENCE LAYER (The Financial Analyst) ---
+def generate_advanced_analysis(human_score, flags, user_idea):
     
-    full_prompt = f"""
-    SYSTEM INSTRUCTION:
-    You are 'The Reality Circuit', a scientific decision-support engine.
-    You analyze ideas based STRICTLY on the provided 'Thinking Framework'.
+    prompt = f"""
+    You are 'The Reality Circuit', a strategic AI consultant.
     
-    FRAMEWORK DATA:
-    {THINKING_FRAMEWORK}
+    USER IDEA: "{user_idea}"
+    USER STATE FLAGS: {flags}
+    HUMAN READINESS SCORE: {human_score}/100
     
     YOUR TASK:
-    1. Review the User's Idea and their 'Human State' (Flags).
-    2. Cross-reference this with the 'Reference Document' rules.
-    3. Generate a 'Reality Prescription' in 3 distinct parts:
-       - THE DIAGNOSIS: Identify which specific factor (Biological/Cognitive/Data) is the biggest threat.
-       - THE PREDICTION: Predict how this idea will fail if they execute it NOW.
-       - THE PRESCRIPTION: One scientific action to take.
+    Analyze this idea objectively and return a JSON object with these exact fields:
     
-    Keep it professional, direct, and under 100 words.
+    1. "logic_score": (0-100) How logical/feasible is the idea itself?
+    2. "emotion_score": (0-100) How much is this driven by emotion? (High is bad).
+    3. "data_score": (0-100) How likely is this supported by real-world data?
+    4. "financial_score": (0-100) What is the money-making potential?
+    5. "diagnosis": A 1-sentence summary of the biggest risk.
+    6. "financial_advice": 2 specific ways to monetize or optimize this idea for profit.
+    7. "verdict": "GO", "NO-GO", or "PIVOT".
 
-    USER INPUT:
-    - IDEA: "{user_idea}"
-    - CURRENT STATE FLAGS: {", ".join(flags) if flags else "None. State is Optimal."}
-    - REALITY SCORE: {score}/100.
+    Return ONLY raw JSON. No markdown formatting.
     """
 
     try:
-        response = model.generate_content(full_prompt)
-        return response.text
+        response = model.generate_content(prompt)
+        # Clean up text to ensure it's valid JSON
+        text = response.text.replace('```json', '').replace('```', '').strip()
+        return json.loads(text)
     except Exception as e:
-        print(f"API Error: {e}")
-        return "System Overload. The Reality Engine is currently offline."
+        print(f"AI Error: {e}")
+        print(f"AI Error Type: {type(e).__name__}")
+        import traceback
+        print("Full traceback:")
+        traceback.print_exc()
+        # Fallback if AI fails
+        return {
+            "logic_score": 50, "emotion_score": 50, "data_score": 50, "financial_score": 50,
+            "diagnosis": "AI Analysis Failed. Please try again.",
+            "financial_advice": ["Check internet connection"],
+            "verdict": "ERROR"
+        }
 
-# ==========================================
-# 🚀 API ENDPOINT
-# ==========================================
 @app.route('/calculate', methods=['POST'])
 def analyze():
     data = request.json
     
-    idea = data.get('user_idea', 'No idea provided')
-    physical = data.get('physical_state')
-    social = data.get('social_feedback')
-    emotional = data.get('emotional_state')
-    motivation = data.get('motivation')
+    # 1. Calculate Human Readiness (The "Operator")
+    human_score, flags = calculate_human_score(
+        data.get('physical_state'), 
+        data.get('social_feedback'), 
+        data.get('emotional_state'), 
+        data.get('motivation')
+    )
 
-    result = calculate_grounded_score(physical, social, emotional, motivation)
+    # 2. Calculate Business Viability (The "Idea")
+    ai_analysis = generate_advanced_analysis(human_score, flags, data.get('user_idea'))
 
-    # Scientific Analysis
-    result['prescription'] = generate_scientific_analysis(result['score'], result['flags'], idea)
+    # 3. Combine Data
+    response = {
+        "human_score": human_score,
+        "flags": flags,
+        "analysis": ai_analysis
+    }
 
-    return jsonify(result)
+    return jsonify(response)
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    # Lightweight health check to verify running code and configured model
+    return jsonify({
+        "status": "ok",
+        "model": "gemini-2.0-flash",
+        "has_api_key": bool(GOOGLE_API_KEY)
+    })
 
 if __name__ == '__main__':
-    # Use the PORT provided by Render/Cloud, default to 8080 locally
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
