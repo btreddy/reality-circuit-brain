@@ -1,4 +1,7 @@
 flask
 flask-cors
-google-generativeai>=0.7.2
-gunicorn
+google-generativeai
+reportlab
+python-dotenv
+flask-sqlalchemy
+psycopg2-binary
