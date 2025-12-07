@@ -1,125 +1,231 @@
-/* Main.css - SCI-FI SCANNER THEME */
 :root {
-  --bg-color: #050505;
-  --terminal-green: #0aff0a;
-  --terminal-red: #ff2a2a;
-  --terminal-blue: #0acaff;
-  --glass-panel: rgba(20, 30, 20, 0.8);
+  --neon-green: #00ff41;
+  --neon-red: #ff0055;
+  --neon-blue: #00f3ff;
+  --bg-dark: #050505;
+  --panel-bg: rgba(10, 20, 10, 0.85);
 }
 
 body {
-  background-color: var(--bg-color);
-  color: var(--terminal-green);
-  font-family: 'Courier New', Courier, monospace;
   margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  background-color: var(--bg-dark);
+  background-image: 
+    linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+  font-family: 'Share Tech Mono', monospace;
+  color: #fff;
   min-height: 100vh;
 }
 
-/* THE SCANNER CONTAINER */
-.scanner-frame {
+.app-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+  border-bottom: 2px solid var(--neon-green);
+  padding-bottom: 20px;
+}
+
+.header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2.5rem;
+  color: var(--neon-green);
+  text-shadow: 0 0 10px var(--neon-green);
+  letter-spacing: 4px;
+  margin: 0;
+}
+
+/* --- FORM STYLING --- */
+.input-group {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  color: var(--neon-blue);
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+}
+
+textarea, select {
   width: 100%;
-  max-width: 600px;
-  background: var(--glass-panel);
-  border: 1px solid var(--terminal-green);
-  box-shadow: 0 0 20px rgba(10, 255, 10, 0.2);
-  padding: 2rem;
+  padding: 15px;
+  background: #000;
+  border: 1px solid #333;
+  color: #fff;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1rem;
+  box-sizing: border-box; /* Fixes padding width issues */
+}
+
+textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--neon-green);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+}
+
+.cyber-button {
+  width: 100%;
+  padding: 20px;
+  background: transparent;
+  border: 2px solid var(--neon-green);
+  color: var(--neon-green);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: 20px;
+}
+
+.cyber-button:hover {
+  background: var(--neon-green);
+  color: #000;
+  box-shadow: 0 0 30px var(--neon-green);
+}
+
+.cyber-button:disabled {
+  border-color: #555;
+  color: #555;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* --- LOADING SCANNER --- */
+.scanner-overlay {
+  margin: 40px 0;
+  height: 4px;
+  background: #111;
   position: relative;
   overflow: hidden;
 }
 
-/* THE "SCAN LINE" ANIMATION */
-.scan-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 4px;
-  background: var(--terminal-green);
-  box-shadow: 0 0 10px var(--terminal-green);
-  opacity: 0.5;
-  animation: scan 3s linear infinite;
-  pointer-events: none;
+.scan-beam {
+  width: 50%;
+  height: 100%;
+  background: var(--neon-green);
+  box-shadow: 0 0 20px var(--neon-green);
+  animation: scan 1s infinite alternate;
 }
 
 @keyframes scan {
-  0% { top: -10%; }
-  100% { top: 110%; }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
 }
 
-/* TYPOGRAPHY */
-h1, h2 {
+/* --- RESULT CERTIFICATE --- */
+.result-section {
+  margin-top: 40px;
+  background: #000;
+  border: 2px solid var(--neon-green);
+  padding: 40px;
+  position: relative;
+  box-shadow: 0 0 50px rgba(0, 255, 65, 0.1);
+  /* Ensure background is opaque for PDF */
+  background-color: #050505; 
+}
+
+/* Corner decorations */
+.result-section::before {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px;
+  width: 30px; height: 30px;
+  border-top: 4px solid var(--neon-green);
+  border-left: 4px solid var(--neon-green);
+}
+.result-section::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; right: -2px;
+  width: 30px; height: 30px;
+  border-bottom: 4px solid var(--neon-green);
+  border-right: 4px solid var(--neon-green);
+}
+
+.verdict-box {
+  text-align: center;
+  border: 2px solid #333;
+  padding: 30px;
+  margin-bottom: 30px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.verdict-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 3rem;
+  margin: 0;
+  text-shadow: 0 0 20px currentColor;
+}
+
+.diagnosis-text {
+  font-size: 1.2rem;
+  line-height: 1.6;
+  margin-top: 20px;
+  color: #ddd;
+  font-style: italic;
+}
+
+/* --- SCORES GRID --- */
+.scores-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.score-card {
+  border: 1px solid #333;
+  padding: 15px;
+  background: #080808;
+}
+
+.score-card h3 {
+  color: var(--neon-blue);
+  margin: 0 0 10px 0;
+  font-size: 1rem;
+}
+
+.progress-container {
+  height: 10px;
+  background: #222;
+  width: 100%;
+  margin-bottom: 5px;
+}
+
+.progress-fill {
+  height: 100%;
+  box-shadow: 0 0 10px currentColor;
+  transition: width 1s ease-out;
+}
+
+.score-value {
+  float: right;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.download-btn {
+  background: #222;
+  color: #fff;
+  border: 1px solid #fff;
+  padding: 15px;
+  width: 100%;
+  margin-top: 30px;
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif;
   text-transform: uppercase;
   letter-spacing: 2px;
-  border-bottom: 1px dashed var(--terminal-green);
-  padding-bottom: 10px;
-  text-shadow: 0 0 5px var(--terminal-green);
 }
 
-p {
-  font-size: 1.1rem;
-  line-height: 1.5;
-}
-
-/* INPUTS AND BUTTONS */
-input[type="text"] {
-  width: 100%;
-  background: #000;
-  border: 1px solid var(--terminal-green);
-  color: var(--terminal-green);
-  padding: 15px;
-  font-family: inherit;
-  font-size: 1.2rem;
-  margin-bottom: 20px;
-  outline: none;
-}
-
-input[type="text"]:focus {
-  box-shadow: 0 0 10px var(--terminal-green);
-}
-
-.neon-btn {
-  background: transparent;
-  border: 1px solid var(--terminal-green);
-  color: var(--terminal-green);
-  padding: 15px;
-  width: 100%;
-  margin-bottom: 10px;
-  cursor: pointer;
-  text-transform: uppercase;
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.neon-btn:hover {
-  background: var(--terminal-green);
+.download-btn:hover {
+  background: #fff;
   color: #000;
-  box-shadow: 0 0 15px var(--terminal-green);
-}
-
-/* RESULTS SCREEN */
-.result-box {
-  border: 1px solid var(--terminal-blue);
-  padding: 20px;
-  margin-top: 20px;
-  background: rgba(10, 202, 255, 0.1);
-  color: var(--terminal-blue);
-}
-
-.risk-flag {
-  color: var(--terminal-red);
-  border-left: 3px solid var(--terminal-red);
-  padding-left: 10px;
-  margin: 5px 0;
-}
-
-/* BLINK ANIMATION */
-.blink {
-  animation: blinker 1s linear infinite;
-}
-
-@keyframes blinker {
-  50% { opacity: 0; }
 }
