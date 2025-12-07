@@ -229,3 +229,58 @@ textarea:focus, select:focus {
   background: #fff;
   color: #000;
 }
+/* --- QUESTION BOX IN REPORT --- */
+.report-header {
+  border-bottom: 1px dashed #333;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+.report-label {
+  color: #555;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  margin-bottom: 5px;
+}
+
+.report-question {
+  color: var(--neon-blue);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.2rem;
+  line-height: 1.4;
+  border-left: 3px solid var(--neon-blue);
+  padding-left: 15px;
+  background: rgba(0, 243, 255, 0.05);
+  padding: 10px;
+}
+
+/* --- NEON RADAR CHART --- */
+.chart-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 30px 0;
+  position: relative;
+}
+
+.radar-svg {
+  filter: drop-shadow(0 0 10px var(--neon-green));
+}
+
+.radar-axis {
+  stroke: #333;
+  stroke-width: 1;
+}
+
+.radar-shape {
+  fill: rgba(0, 255, 65, 0.2);
+  stroke: var(--neon-green);
+  stroke-width: 2;
+  transition: all 1s ease;
+}
+
+.chart-label {
+  font-size: 10px;
+  fill: var(--neon-blue);
+  text-anchor: middle; 
+}
