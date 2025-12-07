@@ -73,7 +73,7 @@ def home():
 def calculate_reality():
     try:
         data = request.json
-        user_input = data.get('statement', '')
+        user_input = data.get('statement') or data.get('text') or data.get('input') or ''
 
         if not user_input:
             return jsonify({"error": "No statement provided"}), 400
