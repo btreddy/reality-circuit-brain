@@ -73,15 +73,32 @@ def home():
 def calculate_reality():
     try:
         data = request.json
-        print(f"DEBUG - INCOMING DATA: {data}")
-        user_input = data.get('statement') or data.get('text') or data.get('input') or ''
+        print(f"DEBUG - INCOMING DATA: {data}")  # Keep this for safety
 
-        if not user_input:
-            return jsonify({"error": "No statement provided"}), 400
+        # 1. EXTRACT DATA (Using the keys your frontend is actually sending)
+        user_idea = data.get('user_idea', '')
+        physical = data.get('physical_state', 'neutral')
+        social = data.get('social_feedback', 'none')
+        emotion = data.get('emotional_state', 'neutral')
+        motivation = data.get('motivation', 'neutral')
 
-        # Prompt for Gemini
+        # Combine them for the Database Subject
+        full_subject = f"{user_idea} (State: {physical}, {emotion})"
+
+        if not user_idea:
+            return jsonify({"error": "No idea provided"}), 400
+
+        # 2. CONSTRUCT PROMPT (Give context to Gemini)
         prompt = f"""
-        Analyze this business/life decision: "{user_input}"
+        Analyze this business/life decision with the following context:
+        
+        THE IDEA: "{user_idea}"
+        
+        USER CONTEXT:
+        - Physical State: {physical} (Is this affecting judgment?)
+        - Social Feedback: {social} (Is this an echo chamber?)
+        - Emotional State: {emotion} (Is this urgency bias?)
+        - Motivation: {motivation}
         
         Provide a JSON response with exactly this structure:
         {{
@@ -90,14 +107,14 @@ def calculate_reality():
             "money_score": (0-100),
             "ability_score": (0-100),
             "verdict": "GO" or "NO GO",
-            "diagnosis": "A short, sharp 2-sentence summary of why."
+            "diagnosis": "A short, sharp 2-sentence summary of the risk vs reward, mentioning biases if detected."
         }}
         """
 
         response = model.generate_content(prompt)
         ai_text = response.text
 
-        # Clean up JSON formatting (remove markdown ```json if present)
+        # Clean up JSON formatting
         clean_text = re.sub(r"```json|```", "", ai_text).strip()
         result = json.loads(clean_text)
 
@@ -108,6 +125,29 @@ def calculate_reality():
         ability = result.get('ability_score', 0)
         verdict = result.get('verdict', "UNKNOWN")
         diagnosis = result.get('diagnosis', "Analysis failed.")
+
+        # 3. SAVE TO DATABASE
+        try:
+            new_entry = RealityCheck(
+                subject=full_subject[:500], 
+                verdict=verdict,
+                diagnosis=diagnosis,
+                logic_score=logic,
+                data_score=data_val,
+                money_score=money,
+                ability_score=ability
+            )
+            db.session.add(new_entry)
+            db.session.commit()
+            print("--- RESULT SAVED TO DATABASE ---")
+        except Exception as e:
+            print(f"Database Save Error: {e}")
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"SERVER ERROR: {e}")
+        return jsonify({"error": str(e)}), 500
 
         # --- SAVE TO DATABASE ---
         try:
