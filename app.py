@@ -7,14 +7,13 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# 1. Get Key from Environment (Cloud) or use fallback (Local)
+# 1. Get Key
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "AIzaSyAgKIZt7FlD8kssKE98IHFlkmTG1_t84R0")
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# 2. FORCE STABLE MODEL (Fixes the 404 error)
+# 2. Force Model
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# ... (Keep your calculate_human_score function exactly as is) ...
 def calculate_human_score(physical, social, emotional, motivation):
     score = 100
     flags = []
@@ -29,13 +28,14 @@ def generate_advanced_analysis(human_score, flags, user_idea):
     You are 'The Reality Circuit'. USER IDEA: "{user_idea}"
     FLAGS: {flags}. SCORE: {human_score}/100.
     Return JSON: logic_score, emotion_score, data_score, financial_score, diagnosis, financial_advice (list), verdict (GO/NO-GO).
-    NO MARKDOWN. RAW JSON ONLY.
+    RAW JSON ONLY.
     """
     try:
         response = model.generate_content(prompt)
         text = response.text.replace('```json', '').replace('```', '').strip()
         return json.loads(text)
     except Exception as e:
+        print(f"AI Error: {e}")
         return {"verdict": "ERROR", "diagnosis": f"AI Error: {str(e)}", "financial_score": 0, "financial_advice": []}
 
 @app.route('/calculate', methods=['POST'])
