@@ -1,4 +1,4 @@
 flask
 flask-cors
-google-generativeai>=0.7.2
+openai
 gunicorn

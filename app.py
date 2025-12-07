@@ -2,28 +2,26 @@ import os
 import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import google.generativeai as genai
+from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app)
 
-# --- 1. CONFIGURATION ---
-# Get Key from Render Environment, or use your fallback for local testing
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "AIzaSyATBjqTkf7yxvwZS8B6-0B1E16DOgAtXg4")
+# --- 1. CONFIGURATION (DEEPSEEK) ---
+# Get Key from Environment or use fallback for local testing
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-7c2559622e9b4819b5b91b47df200588")
 
-genai.configure(api_key=GOOGLE_API_KEY)
+# Initialize the Client pointing to DeepSeek's URL
+client = OpenAI(
+    api_key= DEEPSEEK_API_KEY,
+    base_url="https://api.deepseek.com"
+)
 
-# --- 2. FORCE STABLE MODEL ---
-# We removed the complex "try/except" block. 
-# We are forcing 'gemini-1.5-flash' because we know it works.
-model = genai.GenerativeModel('gemini-1.5-flash')
-
-# --- 3. LOGIC ENGINE ---
+# --- 2. LOGIC ENGINE (Human Filters) ---
 def calculate_human_score(physical, social, emotional, motivation):
     score = 100
     flags = []
     
-    # Penalties based on your PDF logic
     if physical in ['tired', 'hungry', 'sick']: 
         score -= 25
         flags.append("Biological Risk: Physical State")
@@ -39,35 +37,52 @@ def calculate_human_score(physical, social, emotional, motivation):
 
     return max(score, 0), flags
 
-# --- 4. INTELLIGENCE LAYER ---
+# --- 3. INTELLIGENCE LAYER (DeepSeek V3) ---
 def generate_advanced_analysis(human_score, flags, user_idea):
-    prompt = f"""
-    You are 'The Reality Circuit', a strategic AI consultant.
     
-    USER IDEA: "{user_idea}"
-    FLAGS: {flags}. SCORE: {human_score}/100.
+    # System prompt defines the persona
+    system_instruction = """
+    You are 'The Reality Circuit', a strategic AI consultant.
+    Analyze the user's idea based on the provided risk flags and score.
     
     Return a JSON object with these exact fields: 
     logic_score (0-100), emotion_score (0-100), data_score (0-100), financial_score (0-100), 
     diagnosis (string), financial_advice (list of strings), verdict (GO/NO-GO).
     
-    IMPORTANT: Return ONLY raw JSON. Do not use Markdown blocks.
+    IMPORTANT: Return ONLY raw JSON. Do not use Markdown blocks (```json).
     """
+
+    user_message = f"""
+    USER IDEA: "{user_idea}"
+    FLAGS: {flags}. SCORE: {human_score}/100.
+    """
+
     try:
-        response = model.generate_content(prompt)
-        # Clean up text to ensure it's valid JSON
-        text = response.text.replace('```json', '').replace('```', '').strip()
-        return json.loads(text)
+        response = client.chat.completions.create(
+            model="deepseek-chat",  # This is DeepSeek V3
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_message},
+            ],
+            stream=False,
+            temperature=1.3  # DeepSeek recommends slightly higher temp for V3 creative tasks
+        )
+        
+        # Extract and clean the JSON
+        content = response.choices[0].message.content
+        cleaned_text = content.replace('```json', '').replace('```', '').strip()
+        return json.loads(cleaned_text)
+
     except Exception as e:
-        print(f"AI Error: {e}")
+        print(f"DeepSeek Error: {e}")
         return {
             "verdict": "ERROR", 
-            "diagnosis": f"AI Connection Failed. Error: {str(e)}", 
+            "diagnosis": f"DeepSeek Connection Failed. Error: {str(e)}", 
             "financial_score": 0, 
-            "financial_advice": ["Check API Key", "Check Model Name"]
+            "financial_advice": ["Check API Key Balance", "Check Server Logs"]
         }
 
-# --- 5. API ENDPOINT ---
+# --- 4. API ENDPOINT ---
 @app.route('/calculate', methods=['POST'])
 def analyze():
     data = request.json
