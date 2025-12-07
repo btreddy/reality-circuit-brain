@@ -148,11 +148,32 @@ function App() {
         {error && <div className="error-message">{error}</div>}
 
         {result && (
-          <div className="result-section" ref={resultRef}>
-            <div className="verdict-box" style={{ borderColor: result.verdict === 'GO' ? '#0f0' : '#f00' }}>
-              <h2>VERDICT: <span style={{ color: result.verdict === 'GO' ? '#0f0' : '#f00' }}>{result.verdict}</span></h2>
-              <p className="diagnosis">{result.diagnosis}</p>
-            </div>
+          <div className="result-section" ref={resultRef} style={{ marginTop: '20px', padding: '20px', background: '#111', border: '1px solid #333', borderRadius: '10px' }}>
+            
+              <div className="verdict-box" style={{ 
+                border: `2px solid ${result.verdict === 'GO' ? '#00ff00' : '#ff0055'}`, 
+                padding: '20px', 
+                borderRadius: '8px', 
+                marginBottom: '20px',
+                textAlign: 'center',
+                backgroundColor: 'rgba(0,0,0,0.5)'
+              }}>
+                <h2 style={{ color: '#fff', margin: '0 0 10px 0' }}>
+                  VERDICT: <span style={{ color: result.verdict === 'GO' ? '#00ff00' : '#ff0055', fontWeight: 'bold' }}>{result.verdict}</span>
+                </h2>
+                
+                {/* FORCE VISIBLE TEXT HERE */}
+                <h3 style={{ color: '#aaa', fontSize: '14px', marginTop: '15px' }}>AI ANALYSIS:</h3>
+                <p style={{ 
+                   color: '#ffffff', 
+                   fontSize: '16px', 
+                   lineHeight: '1.5', 
+                   fontStyle: 'italic',
+                   margin: '10px 0' 
+                }}>
+                  "{result.diagnosis || "Error: Diagnosis text is missing."}"
+                </p>
+              </div>
 
             <div className="diamond-container">
               {/* This draws the green diamond shape */}
