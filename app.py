@@ -7,22 +7,14 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURATION ---
-# Get Key from Render Environment
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-
-# Fallback for testing (Remove this before sharing code publicly if you want)
-if not GOOGLE_API_KEY:
-    GOOGLE_API_KEY = "AIzaSyAgKIZt7FlD8kssKE98IHFlkmTG1_t84R0"
-
+# 1. Get Key from Environment (Cloud) or use fallback (Local)
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "AIzaSyAgKIZt7FlD8kssKE98IHFlkmTG1_t84R0")
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- FORCE STABLE MODEL ---
-# We use 'gemini-1.5-flash' because it is the fastest and most reliable free model.
-# No auto-detect. No experimental versions.
+# 2. FORCE STABLE MODEL (Fixes the 404 error)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- LOGIC ENGINE ---
+# ... (Keep your calculate_human_score function exactly as is) ...
 def calculate_human_score(physical, social, emotional, motivation):
     score = 100
     flags = []
@@ -36,23 +28,15 @@ def generate_advanced_analysis(human_score, flags, user_idea):
     prompt = f"""
     You are 'The Reality Circuit'. USER IDEA: "{user_idea}"
     FLAGS: {flags}. SCORE: {human_score}/100.
-    
-    Return JSON with fields: logic_score, emotion_score, data_score, financial_score, diagnosis, financial_advice (list), verdict (GO/NO-GO).
-    DO NOT use Markdown code blocks. Just raw JSON.
+    Return JSON: logic_score, emotion_score, data_score, financial_score, diagnosis, financial_advice (list), verdict (GO/NO-GO).
+    NO MARKDOWN. RAW JSON ONLY.
     """
     try:
         response = model.generate_content(prompt)
-        # heavy cleaning to prevent JSON errors
         text = response.text.replace('```json', '').replace('```', '').strip()
         return json.loads(text)
     except Exception as e:
-        print(f"AI Error: {e}")
-        return {
-            "verdict": "ERROR", 
-            "diagnosis": f"AI Brain Connection Failed. Error: {str(e)}", 
-            "financial_score": 0, 
-            "financial_advice": []
-        }
+        return {"verdict": "ERROR", "diagnosis": f"AI Error: {str(e)}", "financial_score": 0, "financial_advice": []}
 
 @app.route('/calculate', methods=['POST'])
 def analyze():
