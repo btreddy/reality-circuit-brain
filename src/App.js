@@ -2,16 +2,13 @@ import React, { useState, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './Main.css';
-import History from './History'; // Import the new Vault
+import History from './History'; 
 
 // 🚀 LIVE BACKEND
 const API_URL = "https://reality-circuit-brain.onrender.com";
 
 function App() {
-  // --- NAVIGATION STATE ---
-  const [view, setView] = useState('scanner'); // 'scanner' or 'history'
-
-  // --- SCANNER STATES ---
+  const [view, setView] = useState('scanner'); 
   const [userIdea, setUserIdea] = useState('');
   const [physicalState, setPhysicalState] = useState('neutral');
   const [socialFeedback, setSocialFeedback] = useState('none');
@@ -47,10 +44,8 @@ function App() {
       });
 
       if (!response.ok) throw new Error('Server returned an error');
-
       const data = await response.json();
       if (!data.verdict) throw new Error("Incomplete analysis.");
-
       setTimeout(() => { setResult(data); }, 1500);
 
     } catch (err) {
@@ -67,7 +62,6 @@ function App() {
     const originalStyle = resultRef.current.style.cssText;
     resultRef.current.style.width = "800px"; 
     resultRef.current.style.padding = "40px";
-    
     try {
       const canvas = await html2canvas(resultRef.current, { scale: 2, backgroundColor: "#050505", useCORS: true });
       const imgData = canvas.toDataURL('image/png');
@@ -76,11 +70,8 @@ function App() {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Reality_Circuit_Report.pdf`);
-    } catch (err) {
-      console.error("PDF Error:", err);
-    } finally {
-      resultRef.current.style.cssText = originalStyle;
-    }
+    } catch (err) { console.error(err); } 
+    finally { resultRef.current.style.cssText = originalStyle; }
   };
 
   const getColor = (score) => {
@@ -115,7 +106,7 @@ function App() {
     );
   };
 
-  // --- IF IN HISTORY VIEW, SHOW VAULT ---
+  // --- VAULT VIEW ---
   if (view === 'history') {
     return (
       <div className="app-container">
@@ -127,20 +118,30 @@ function App() {
     );
   }
 
-  // --- OTHERWISE, SHOW SCANNER ---
+  // --- SCANNER VIEW ---
   return (
     <div className="app-container">
       <header className="header">
         <h1>REALITY CIRCUIT_v1.0</h1>
         <p>AI BIAS DETECTOR & DECISION ENGINE</p>
         
-        {/* BUTTON TO OPEN VAULT */}
+        {/* --- GLOWING BUTTON UPDATE --- */}
         <button 
            onClick={() => setView('history')} 
-           style={{ background: 'none', border: '1px solid #333', color: '#555', cursor: 'pointer', marginTop: '10px', fontSize: '0.8rem', padding: '5px 10px' }}
+           className="cyber-button"
+           style={{ 
+             width: 'auto', 
+             padding: '10px 20px', 
+             marginTop: '15px', 
+             fontSize: '0.9rem',
+             borderColor: 'var(--neon-blue)',
+             color: 'var(--neon-blue)'
+           }}
         >
-           [ OPEN HISTORY VAULT ]
+           [ ACCESS HISTORY VAULT ]
         </button>
+        {/* ----------------------------- */}
+
       </header>
 
       <main>
