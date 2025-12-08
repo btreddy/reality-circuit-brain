@@ -7,6 +7,9 @@ import History from './History';
 // 🚀 LIVE BACKEND
 const API_URL = "https://reality-circuit-brain.onrender.com";
 
+// 🔐 YOUR SECRET ADMIN CODE
+const ADMIN_PIN = "2025"; 
+
 function App() {
   const [view, setView] = useState('scanner'); 
   const [userIdea, setUserIdea] = useState('');
@@ -20,6 +23,16 @@ function App() {
   const [error, setError] = useState('');
   
   const resultRef = useRef(null);
+
+  // --- SECURITY CHECK FUNCTION ---
+  const handleOpenVault = () => {
+    const input = prompt("🔐 SECURITY ALERT: ENTER ADMIN ACCESS CODE");
+    if (input === ADMIN_PIN) {
+      setView('history');
+    } else {
+      alert("❌ ACCESS DENIED: UNAUTHORIZED USER");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -122,9 +135,9 @@ function App() {
   return (
     <div className="app-container">
       
-      {/* 🛑 THE NUCLEAR FLOATING BUTTON 🛑 */}
+      {/* 🔐 SECURE FLOATING BUTTON 🔐 */}
       <button 
-           onClick={() => setView('history')} 
+           onClick={handleOpenVault}  // <--- NOW CALLS SECURITY CHECK
            style={{ 
              position: 'fixed',
              top: '20px',
@@ -143,7 +156,6 @@ function App() {
       >
            [ OPEN VAULT ]
       </button>
-      {/* ---------------------------------- */}
 
       <header className="header">
         <h1>REALITY CIRCUIT_v1.0</h1>
