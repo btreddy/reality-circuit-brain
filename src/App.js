@@ -121,27 +121,33 @@ function App() {
   // --- SCANNER VIEW ---
   return (
     <div className="app-container">
+      
+      {/* 🛑 THE NUCLEAR FLOATING BUTTON 🛑 */}
+      <button 
+           onClick={() => setView('history')} 
+           style={{ 
+             position: 'fixed',
+             top: '20px',
+             right: '20px',
+             zIndex: 99999,
+             background: 'rgba(0,0,0,0.9)',
+             border: '2px solid #00f3ff',
+             color: '#00f3ff',
+             padding: '15px 20px',
+             cursor: 'pointer',
+             fontWeight: 'bold',
+             boxShadow: '0 0 20px #00f3ff',
+             fontFamily: 'Orbitron, sans-serif',
+             fontSize: '0.9rem'
+           }}
+      >
+           [ OPEN VAULT ]
+      </button>
+      {/* ---------------------------------- */}
+
       <header className="header">
         <h1>REALITY CIRCUIT_v1.0</h1>
         <p>AI BIAS DETECTOR & DECISION ENGINE</p>
-        
-        {/* --- GLOWING BUTTON UPDATE --- */}
-        <button 
-           onClick={() => setView('history')} 
-           className="cyber-button"
-           style={{ 
-             width: 'auto', 
-             padding: '10px 20px', 
-             marginTop: '15px', 
-             fontSize: '0.9rem',
-             borderColor: 'var(--neon-blue)',
-             color: 'var(--neon-blue)'
-           }}
-        >
-           [ ACCESS HISTORY VAULT ]
-        </button>
-        {/* ----------------------------- */}
-
       </header>
 
       <main>
