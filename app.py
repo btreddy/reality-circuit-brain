@@ -175,7 +175,30 @@ def calculate_reality():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+    
+# --- HISTORY ENDPOINT ---
+@app.route('/history', methods=['GET'])
+def get_history():
+    try:
+        # Fetch last 50 entries, newest first
+        history = RealityCheck.query.order_by(RealityCheck.timestamp.desc()).limit(50).all()
+        
+        # Convert database rows to JSON list
+        data = []
+        for h in history:
+            data.append({
+                "id": h.id,
+                "date": h.timestamp.strftime("%Y-%m-%d %H:%M"),
+                "subject": h.subject,
+                "verdict": h.verdict,
+                "logic": h.logic_score,
+                "money": h.money_score,
+                "diagnosis": h.diagnosis
+            })
+        
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
