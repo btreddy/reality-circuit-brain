@@ -8,7 +8,7 @@ import History from './History';
 const API_URL = "https://reality-circuit-brain.onrender.com";
 
 // 🔐 YOUR SECRET ADMIN CODE
-const ADMIN_PIN = "2025"; 
+const ADMIN_PIN = "8448"; 
 
 function App() {
   const [view, setView] = useState('scanner'); 
