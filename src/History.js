@@ -26,13 +26,70 @@ function History({ onBack }) {
     }
   };
 
+  // --- NEW: EXPORT TO EXCEL/CSV FUNCTION ---
+  const downloadCSV = () => {
+    if (history.length === 0) return;
+
+    // 1. Define the Column Headers
+    const headers = ["ID", "Date", "Verdict", "Idea Subject", "Logic Score", "Money Score", "Diagnosis"];
+    
+    // 2. Convert Data to CSV Format
+    const rows = history.map(item => {
+      // We must wrap text in quotes "..." to handle commas inside the idea text
+      const cleanSubject = `"${item.subject.replace(/"/g, '""')}"`; 
+      const cleanDiagnosis = `"${item.diagnosis.replace(/"/g, '""')}"`;
+      
+      return [
+        item.id,
+        item.date,
+        item.verdict,
+        cleanSubject,
+        item.logic,
+        item.money,
+        cleanDiagnosis
+      ].join(",");
+    });
+
+    // 3. Combine Headers and Rows
+    const csvContent = [headers.join(","), ...rows].join("\n");
+
+    // 4. Create the Download Link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Reality_Circuit_Database_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="history-container">
-      <div className="header" style={{ borderBottom: '1px dashed #333' }}>
+      <div className="header" style={{ borderBottom: '1px dashed #333', paddingBottom: '20px' }}>
         <h2 style={{ color: 'var(--neon-blue)', margin: 0 }}>ARCHIVE_VAULT</h2>
-        <button onClick={onBack} className="cyber-button" style={{ width: 'auto', padding: '10px 20px', marginTop: '10px' }}>
-          ← RETURN TO SCANNER
-        </button>
+        
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          {/* BACK BUTTON */}
+          <button onClick={onBack} className="cyber-button" style={{ width: 'auto', padding: '10px 20px', fontSize: '0.8rem' }}>
+            ← BACK
+          </button>
+
+          {/* NEW EXPORT BUTTON */}
+          <button 
+            onClick={downloadCSV} 
+            className="cyber-button" 
+            style={{ 
+              width: 'auto', 
+              padding: '10px 20px', 
+              fontSize: '0.8rem',
+              borderColor: '#ffd700', 
+              color: '#ffd700' 
+            }}
+          >
+            ⬇ DOWNLOAD EXCEL (.CSV)
+          </button>
+        </div>
       </div>
 
       {loading && <div style={{ color: '#fff', textAlign: 'center', marginTop: '50px' }}>ACCESSING SECURE DATABASE...</div>}
