@@ -25,10 +25,11 @@ def get_db_connection():
     return conn
 
 # --- HELPER: AUTO-DETECT AI MODEL ---
+# --- HELPER: AUTO-DETECT AI MODEL ---
 def get_working_model_name():
     """
     Connects to Google and asks for a list of available models.
-    Returns the best one found (preferring Flash), or a safe default.
+    Returns the best one found (preferring 2.5 Flash), or a safe default.
     """
     try:
         print("--- CHECKING AVAILABLE MODELS ---")
@@ -36,28 +37,35 @@ def get_working_model_name():
         
         # list_models() gets everything your API key can access
         for m in genai.list_models():
-            # We only want models that can generate text (not image-only ones)
             if 'generateContent' in m.supported_generation_methods:
                 available_models.append(m.name)
         
         print(f"Found models: {available_models}")
 
-        # 1. Try to find our preferred 'Flash' model first (fast & cheap)
+        # Priority 1: Try the newest 2.5 Flash (from your dashboard)
         for model in available_models:
-            if "gemini-1.5-flash" in model:
+            if "gemini-2.5-flash" in model:
                 return model
-        
-        # 2. If Flash isn't there, try the new Experimental 2.0
+
+        # Priority 2: Try 2.0 Flash Experimental
         for model in available_models:
             if "gemini-2.0-flash" in model:
                 return model
+
+        # Priority 3: Try 1.5 Flash
+        for model in available_models:
+            if "gemini-1.5-flash" in model:
+                return model
                 
-        # 3. If neither exists, just grab the first valid text model in the list
+        # Priority 4: If none match, grab the first valid text model
         if available_models:
             return available_models[0]
 
     except Exception as e:
         print(f"Error listing models: {e}")
+    
+    # CRITICAL CHANGE: Fallback to the one you see in your dashboard
+    return 'gemini-2.5-flash'
     
     # 4. Absolute fallback if everything fails
     return 'gemini-1.5-flash'
