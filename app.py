@@ -60,7 +60,54 @@ def generate_war_room_response(user_message, room_id):
 
     # 3. Generate Response using Gemini
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+       # --- ADD THIS HELPER FUNCTION AT THE TOP OF YOUR FILE ---
+def get_working_model_name():
+    """
+    Connects to Google and asks for a list of available models.
+    Returns the best one found (preferring Flash), or a safe default.
+    """
+    try:
+        print("--- CHECKING AVAILABLE MODELS ---")
+        available_models = []
+        
+        # list_models() gets everything your API key can access
+        for m in genai.list_models():
+            # We only want models that can generate text (not image-only ones)
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+        
+        print(f"Found models: {available_models}")
+
+        # 1. Try to find our preferred 'Flash' model first (fast & cheap)
+        for model in available_models:
+            if "gemini-1.5-flash" in model:
+                return model
+        
+        # 2. If Flash isn't there, try the new Experimental 2.0 (from your screenshot)
+        for model in available_models:
+            if "gemini-2.0-flash" in model:
+                return model
+                
+        # 3. If neither exists, just grab the first valid text model in the list
+        if available_models:
+            return available_models[0]
+
+    except Exception as e:
+        print(f"Error listing models: {e}")
+    
+    # 4. Absolute fallback if everything fails
+    return 'gemini-1.5-flash'
+
+# --- USE THE FUNCTION IN YOUR CHAT ROUTE ---
+
+# Instead of hardcoding 'gemini-1.5-flash', do this:
+best_model_name = get_working_model_name()
+print(f"Selected AI Model: {best_model_name}")
+
+model = genai.GenerativeModel(best_model_name)
+
+# Now generate your response as usual
+# response = model.generate_content(full_prompt)
         response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
