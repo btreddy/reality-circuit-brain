@@ -1,6 +1,10 @@
 flask
 flask-cors
 psycopg2-binary
-openai
-tavily-python
 gunicorn
+google-generativeai
+tavily-python
+python-dotenv
+reportlab
+flask-sqlalchemy
+requests
