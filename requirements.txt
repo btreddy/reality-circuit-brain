@@ -2,9 +2,10 @@ flask
 flask-cors
 psycopg2-binary
 gunicorn
-google-generativeai>=0.7.2
 tavily-python
 python-dotenv
 reportlab
 flask-sqlalchemy
 requests
+google-generativeai>=0.8.3
+langchain-google-genai>=2.0.0
