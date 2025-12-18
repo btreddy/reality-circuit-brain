@@ -1,204 +1,133 @@
 import os
-import json
-import re
-from flask import Flask, request, jsonify, send_file, make_response
+import psycopg2
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import google.generativeai as genai
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from dotenv import load_dotenv
-
-# Database Imports
-from flask_sqlalchemy import SQLAlchemy
+from tavily import TavilyClient
+from openai import OpenAI
 from datetime import datetime
 
-# Load environment variables
-load_dotenv()
-
+# --- CONFIGURATION ---
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Allow React Frontend to talk to this Backend
 
-# --- DATABASE CONFIGURATION ---
-# This grabs the URL from Render. If running locally, it creates a file named 'local_reality.db'
-db_url = os.environ.get('DATABASE_URL', 'sqlite:///local_reality.db')
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+# Load Environment Variables (Set these in Render/Vercel)
+DB_URI = os.environ.get("DATABASE_URL")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
 
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Initialize Clients
+tavily = TavilyClient(api_key=TAVILY_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-db = SQLAlchemy(app)
+# --- HELPER: DATABASE CONNECTION ---
+def get_db_connection():
+    conn = psycopg2.connect(DB_URI)
+    return conn
 
-# Define the "RealityCheck" Table
-class RealityCheck(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    subject = db.Column(db.String(500))  # The user's input
-    verdict = db.Column(db.String(50))   # GO / NO GO
-    diagnosis = db.Column(db.Text)       # The full AI explanation
+# --- HELPER: AI AGENT WITH SEARCH ---
+def generate_war_room_response(user_message, room_id):
+    """
+    The AI acts as a consultant. It decides if it needs to search the web 
+    before answering.
+    """
     
-    # Scores
-    logic_score = db.Column(db.Integer)
-    data_score = db.Column(db.Integer)
-    money_score = db.Column(db.Integer)
-    ability_score = db.Column(db.Integer)
-
-# Create the database tables
-with app.app_context():
-    db.create_all()
-
-# --- AI CONFIGURATION ---
-api_key = os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=api_key)
-
-generation_config = {
-    "temperature": 1,
-    "top_p": 0.95,
-    "top_k": 40,
-    "max_output_tokens": 8192,
-    "response_mime_type": "text/plain",
-}
-
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash-exp",
-    generation_config=generation_config,
-)
-
-@app.route('/')
-def home():
-    return "Reality Circuit Brain is Active (Database Connected)!"
-
-@app.route('/calculate', methods=['POST'])
-def calculate_reality():
-    try:
-        data = request.json
-        print(f"DEBUG - INCOMING DATA: {data}")  # Keep this for safety
-
-        # 1. EXTRACT DATA (Using the keys your frontend is actually sending)
-        user_idea = data.get('user_idea', '')
-        physical = data.get('physical_state', 'neutral')
-        social = data.get('social_feedback', 'none')
-        emotion = data.get('emotional_state', 'neutral')
-        motivation = data.get('motivation', 'neutral')
-
-        # Combine them for the Database Subject
-        full_subject = f"{user_idea} (State: {physical}, {emotion})"
-
-        if not user_idea:
-            return jsonify({"error": "No idea provided"}), 400
-
-        # 2. CONSTRUCT PROMPT (Give context to Gemini)
-        prompt = f"""
-        Analyze this business/life decision with the following context:
-        
-        THE IDEA: "{user_idea}"
-        
-        USER CONTEXT:
-        - Physical State: {physical} (Is this affecting judgment?)
-        - Social Feedback: {social} (Is this an echo chamber?)
-        - Emotional State: {emotion} (Is this urgency bias?)
-        - Motivation: {motivation}
-        
-        Provide a JSON response with exactly this structure:
-        {{
-            "logic_score": (0-100),
-            "data_score": (0-100),
-            "money_score": (0-100),
-            "ability_score": (0-100),
-            "verdict": "GO" or "NO GO",
-            "diagnosis": "A short, sharp 2-sentence summary of the risk vs reward, mentioning biases if detected."
-        }}
-        """
-
-        response = model.generate_content(prompt)
-        ai_text = response.text
-
-        # Clean up JSON formatting
-        clean_text = re.sub(r"```json|```", "", ai_text).strip()
-        result = json.loads(clean_text)
-
-        # Extract values
-        logic = result.get('logic_score', 0)
-        data_val = result.get('data_score', 0)
-        money = result.get('money_score', 0)
-        ability = result.get('ability_score', 0)
-        verdict = result.get('verdict', "UNKNOWN")
-        diagnosis = result.get('diagnosis', "Analysis failed.")
-
-        # 3. SAVE TO DATABASE
-        try:
-            new_entry = RealityCheck(
-                subject=full_subject[:500], 
-                verdict=verdict,
-                diagnosis=diagnosis,
-                logic_score=logic,
-                data_score=data_val,
-                money_score=money,
-                ability_score=ability
-            )
-            db.session.add(new_entry)
-            db.session.commit()
-            print("--- RESULT SAVED TO DATABASE ---")
-        except Exception as e:
-            print(f"Database Save Error: {e}")
-
-        return jsonify(result)
-
-    except Exception as e:
-        print(f"SERVER ERROR: {e}")
-        return jsonify({"error": str(e)}), 500
-
-        # --- SAVE TO DATABASE ---
-        try:
-            new_entry = RealityCheck(
-                subject=user_input[:500], # Limit text to 500 chars for DB safety
-                verdict=verdict,
-                diagnosis=diagnosis,
-                logic_score=logic,
-                data_score=data_val,
-                money_score=money,
-                ability_score=ability
-            )
-            db.session.add(new_entry)
-            db.session.commit()
-            print("--- RESULT SAVED TO DATABASE ---")
-        except Exception as e:
-            print(f"Database Save Error: {e}")
-        # ------------------------
-
-        # Generate PDF (In-Memory)
-        # Note: I'm returning the JSON + PDF link idea, or simple JSON for now.
-        # Based on your frontend, you likely consume JSON.
-        
-        return jsonify(result)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # 1. Decide if search is needed (Simple keyword check or LLM decision)
+    # For this version, we will perform a search if the prompt asks for "current", "price", "news", or "competitor"
+    needs_search = any(keyword in user_message.lower() for keyword in ["current", "price", "news", "trend", "competitor", "market", "latest"])
     
-# --- HISTORY ENDPOINT ---
-@app.route('/history', methods=['GET'])
-def get_history():
-    try:
-        # Fetch last 50 entries, newest first
-        history = RealityCheck.query.order_by(RealityCheck.timestamp.desc()).limit(50).all()
+    context_data = ""
+    
+    if needs_search:
+        print(f"Searching Tavily for: {user_message}")
+        try:
+            search_result = tavily.search(query=user_message, search_depth="basic")
+            # Compress results for the AI
+            context_data = f"\n[REAL-TIME SEARCH DATA]: {search_result['results']}\n"
+        except Exception as e:
+            print(f"Search failed: {e}")
+            context_data = "\n[Search unavailable, answering from general knowledge]\n"
+
+    # 2. Generate AI Response
+    system_prompt = f"""
+    You are a Strategic Consultant in 'The Innovation War Room'.
+    You are collaborating with a team of business owners.
+    
+    Your Goal: Validate ideas, provide market data, and challenge assumptions.
+    
+    {context_data}
+    
+    If search data is provided above, use it to give specific, grounded answers. 
+    Keep responses concise, professional, and actionable.
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o", # Or gpt-3.5-turbo
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+    )
+    
+    return response.choices[0].message.content
+
+# --- ROUTE 1: GET CHAT HISTORY ---
+@app.route('/api/chat/history', methods=['GET'])
+def get_chat_history():
+    room_id = request.args.get('room_id', 'default_room')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT sender_name, message, is_ai, created_at FROM room_chats WHERE room_id = %s ORDER BY created_at ASC", (room_id,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    history = []
+    for row in rows:
+        history.append({
+            "sender": row[0],
+            "text": row[1],
+            "is_ai": row[2],
+            "timestamp": row[3]
+        })
         
-        # Convert database rows to JSON list
-        data = []
-        for h in history:
-            data.append({
-                "id": h.id,
-                "date": h.timestamp.strftime("%Y-%m-%d %H:%M"),
-                "subject": h.subject,
-                "verdict": h.verdict,
-                "logic": h.logic_score,
-                "money": h.money_score,
-                "diagnosis": h.diagnosis
-            })
-        
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(history)
+
+# --- ROUTE 2: SEND MESSAGE ---
+@app.route('/api/chat/send', methods=['POST'])
+def send_message():
+    data = request.json
+    room_id = data.get('room_id', 'default_room')
+    user_message = data.get('message')
+    sender_name = data.get('sender_name', 'User')
+
+    if not user_message:
+        return jsonify({"error": "No message provided"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 1. Save User Message to DB
+    cur.execute(
+        "INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)",
+        (room_id, sender_name, user_message, False)
+    )
+    conn.commit()
+
+    # 2. Trigger AI Agent
+    ai_reply = generate_war_room_response(user_message, room_id)
+
+    # 3. Save AI Reply to DB
+    cur.execute(
+        "INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)",
+        (room_id, "AI Consultant", ai_reply, True)
+    )
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    return jsonify({"status": "success", "ai_reply": ai_reply})
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)

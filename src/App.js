@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './Main.css';
 import History from './History'; 
+import ChatInterface from './ChatInterface'; // <--- IMPORT NEW COMPONENT
 
 // 🚀 LIVE BACKEND
 const API_URL = "https://reality-circuit-brain.onrender.com";
@@ -11,7 +12,7 @@ const API_URL = "https://reality-circuit-brain.onrender.com";
 const ADMIN_PIN = "8448"; 
 
 function App() {
-  const [view, setView] = useState('scanner'); 
+  const [view, setView] = useState('war_room'); // Default to War Room now? Or 'scanner'
   const [userIdea, setUserIdea] = useState('');
   const [physicalState, setPhysicalState] = useState('neutral');
   const [socialFeedback, setSocialFeedback] = useState('none');
@@ -119,142 +120,155 @@ function App() {
     );
   };
 
-  // --- VAULT VIEW ---
-  if (view === 'history') {
-    return (
-      <div className="app-container">
-        <header className="header">
-          <h1>REALITY CIRCUIT_v1.0</h1>
-        </header>
-        <History onBack={() => setView('scanner')} />
-      </div>
-    );
-  }
-
-  // --- SCANNER VIEW ---
+  // --- RENDER FUNCTION ---
   return (
     <div className="app-container">
       
-      {/* 🔐 SECURE FLOATING BUTTON 🔐 */}
-      <button 
-           onClick={handleOpenVault}  // <--- NOW CALLS SECURITY CHECK
-           style={{ 
-             position: 'fixed',
-             top: '20px',
-             right: '20px',
-             zIndex: 99999,
-             background: 'rgba(0,0,0,0.9)',
-             border: '2px solid #00f3ff',
-             color: '#00f3ff',
-             padding: '15px 20px',
-             cursor: 'pointer',
-             fontWeight: 'bold',
-             boxShadow: '0 0 20px #00f3ff',
-             fontFamily: 'Orbitron, sans-serif',
-             fontSize: '0.9rem'
-           }}
-      >
-           [ OPEN VAULT ]
-      </button>
+      {/* 🔹 NAVIGATION BAR 🔹 */}
+      <nav className="top-nav" style={{display: 'flex', justifyContent: 'center', gap: '20px', padding: '20px'}}>
+         <button 
+           className={view === 'war_room' ? 'nav-btn active' : 'nav-btn'} 
+           onClick={() => setView('war_room')}>
+           WAR ROOM (CHAT)
+         </button>
+         <button 
+           className={view === 'scanner' ? 'nav-btn active' : 'nav-btn'} 
+           onClick={() => setView('scanner')}>
+           SCANNER (CALCULATOR)
+         </button>
+      </nav>
 
-      <header className="header">
-        <h1>REALITY CIRCUIT_v1.0</h1>
-        <p>AI BIAS DETECTOR & DECISION ENGINE</p>
-      </header>
+      {/* --- VIEW: WAR ROOM --- */}
+      {view === 'war_room' && (
+        <div className="war-room-container">
+           <ChatInterface senderName="Admin" />
+        </div>
+      )}
 
-      <main>
-        <form onSubmit={handleSubmit}>
-          <div className="input-group">
-            <label>TARGET SUBJECT (IDEA):</label>
-            <textarea value={userIdea} onChange={(e) => setUserIdea(e.target.value)} placeholder="INPUT DATA STREAM HERE..." rows="3" required />
-          </div>
+      {/* --- VIEW: HISTORY VAULT --- */}
+      {view === 'history' && (
+        <div>
+          <header className="header">
+            <h1>REALITY CIRCUIT_v1.0</h1>
+          </header>
+          <History onBack={() => setView('scanner')} />
+        </div>
+      )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            <div className="input-group">
-              <label>PHYSICAL:</label>
-              <select value={physicalState} onChange={(e) => setPhysicalState(e.target.value)}>
-                <option value="neutral">NEUTRAL</option>
-                <option value="tired">COMPROMISED (TIRED)</option>
-                <option value="energetic">OPTIMAL (HIGH ENERGY)</option>
-                <option value="sick">ERROR (SICK)</option>
-              </select>
-            </div>
-            <div className="input-group">
-              <label>SOCIAL:</label>
-              <select value={socialFeedback} onChange={(e) => setSocialFeedback(e.target.value)}>
-                <option value="none">NO DATA</option>
-                <option value="echo_chamber">ECHO CHAMBER</option>
-                <option value="mixed">MIXED SIGNALS</option>
-                <option value="critical">NEGATIVE FEEDBACK</option>
-              </select>
-            </div>
-            <div className="input-group">
-              <label>EMOTION:</label>
-              <select value={emotionalState} onChange={(e) => setEmotionalState(e.target.value)}>
-                <option value="neutral">STABLE</option>
-                <option value="urgency">URGENCY BIAS</option>
-                <option value="fear">FEAR STATE</option>
-                <option value="excited">MANIC STATE</option>
-              </select>
-            </div>
-            <div className="input-group">
-              <label>MOTIVE:</label>
-              <select value={motivation} onChange={(e) => setMotivation(e.target.value)}>
-                <option value="intrinsic">INTRINSIC</option>
-                <option value="extrinsic">EXTRINSIC ($$)</option>
-                <option value="desperation">SURVIVAL</option>
-              </select>
-            </div>
-          </div>
-
-          <button type="submit" disabled={loading} className="cyber-button">
-            {loading ? 'INITIALIZING SCAN...' : 'EXECUTE ANALYSIS'}
+      {/* --- VIEW: SCANNER --- */}
+      {view === 'scanner' && (
+        <>
+          <button 
+                onClick={handleOpenVault}
+                style={{ 
+                  position: 'fixed', top: '20px', right: '20px', zIndex: 99999,
+                  background: 'rgba(0,0,0,0.9)', border: '2px solid #00f3ff', color: '#00f3ff',
+                  padding: '10px 15px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'Orbitron'
+                }}
+          >
+                [ OPEN VAULT ]
           </button>
-        </form>
 
-        {loading && <div className="scanner-overlay"><div className="scan-beam"></div></div>}
-        {error && <div style={{color: '#ff0055', marginTop: '20px', textAlign: 'center'}}>{error}</div>}
+          <header className="header">
+            <h1>REALITY CIRCUIT_v1.0</h1>
+            <p>AI BIAS DETECTOR & DECISION ENGINE</p>
+          </header>
 
-        {result && (
-          <div className="result-section" ref={resultRef}>
-            <div className="report-header">
-              <div className="report-label">TARGET SUBJECT:</div>
-              <div className="report-question">"{userIdea}"</div>
-            </div>
+          <main>
+            <form onSubmit={handleSubmit}>
+              <div className="input-group">
+                <label>TARGET SUBJECT (IDEA):</label>
+                <textarea value={userIdea} onChange={(e) => setUserIdea(e.target.value)} placeholder="INPUT DATA STREAM HERE..." rows="3" required />
+              </div>
 
-            <div className="verdict-box" style={{ borderColor: result.verdict === 'GO' ? 'var(--neon-green)' : 'var(--neon-red)' }}>
-              <h2 className="verdict-title" style={{ color: result.verdict === 'GO' ? 'var(--neon-green)' : 'var(--neon-red)' }}>
-                {result.verdict}
-              </h2>
-              <div className="diagnosis-text">"{result.diagnosis}"</div>
-            </div>
-
-            {renderChart()}
-
-            <div className="scores-grid">
-              {[
-                { label: 'LOGIC', val: result.logic_score },
-                { label: 'DATA', val: result.data_score },
-                { label: 'MONEY', val: result.money_score },
-                { label: 'ABILITY', val: result.ability_score }
-              ].map((item) => (
-                <div key={item.label} className="score-card">
-                  <h3>{item.label}</h3>
-                  <div className="progress-container">
-                    <div className="progress-fill" style={{ width: `${item.val || 0}%`, backgroundColor: getColor(item.val), boxShadow: `0 0 10px ${getColor(item.val)}` }}></div>
-                  </div>
-                  <div className="score-value" style={{ color: getColor(item.val) }}>{item.val || 0}%</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="input-group">
+                  <label>PHYSICAL:</label>
+                  <select value={physicalState} onChange={(e) => setPhysicalState(e.target.value)}>
+                    <option value="neutral">NEUTRAL</option>
+                    <option value="tired">COMPROMISED (TIRED)</option>
+                    <option value="energetic">OPTIMAL (HIGH ENERGY)</option>
+                    <option value="sick">ERROR (SICK)</option>
+                  </select>
                 </div>
-              ))}
-            </div>
+                <div className="input-group">
+                  <label>SOCIAL:</label>
+                  <select value={socialFeedback} onChange={(e) => setSocialFeedback(e.target.value)}>
+                    <option value="none">NO DATA</option>
+                    <option value="echo_chamber">ECHO CHAMBER</option>
+                    <option value="mixed">MIXED SIGNALS</option>
+                    <option value="critical">NEGATIVE FEEDBACK</option>
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label>EMOTION:</label>
+                  <select value={emotionalState} onChange={(e) => setEmotionalState(e.target.value)}>
+                    <option value="neutral">STABLE</option>
+                    <option value="urgency">URGENCY BIAS</option>
+                    <option value="fear">FEAR STATE</option>
+                    <option value="excited">MANIC STATE</option>
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label>MOTIVE:</label>
+                  <select value={motivation} onChange={(e) => setMotivation(e.target.value)}>
+                    <option value="intrinsic">INTRINSIC</option>
+                    <option value="extrinsic">EXTRINSIC ($$)</option>
+                    <option value="desperation">SURVIVAL</option>
+                  </select>
+                </div>
+              </div>
 
-            <button onClick={downloadPDF} className="download-btn">DOWNLOAD REPORT FILE</button>
-            <div style={{textAlign: 'center', marginTop: '10px', fontSize: '0.8rem', color: '#555'}}>
-               SECURE RECORD SAVED TO DATABASE
-            </div>
-          </div>
-        )}
-      </main>
+              <button type="submit" disabled={loading} className="cyber-button">
+                {loading ? 'INITIALIZING SCAN...' : 'EXECUTE ANALYSIS'}
+              </button>
+            </form>
+
+            {loading && <div className="scanner-overlay"><div className="scan-beam"></div></div>}
+            {error && <div style={{color: '#ff0055', marginTop: '20px', textAlign: 'center'}}>{error}</div>}
+
+            {result && (
+              <div className="result-section" ref={resultRef}>
+                <div className="report-header">
+                  <div className="report-label">TARGET SUBJECT:</div>
+                  <div className="report-question">"{userIdea}"</div>
+                </div>
+
+                <div className="verdict-box" style={{ borderColor: result.verdict === 'GO' ? 'var(--neon-green)' : 'var(--neon-red)' }}>
+                  <h2 className="verdict-title" style={{ color: result.verdict === 'GO' ? 'var(--neon-green)' : 'var(--neon-red)' }}>
+                    {result.verdict}
+                  </h2>
+                  <div className="diagnosis-text">"{result.diagnosis}"</div>
+                </div>
+
+                {renderChart()}
+
+                <div className="scores-grid">
+                  {[
+                    { label: 'LOGIC', val: result.logic_score },
+                    { label: 'DATA', val: result.data_score },
+                    { label: 'MONEY', val: result.money_score },
+                    { label: 'ABILITY', val: result.ability_score }
+                  ].map((item) => (
+                    <div key={item.label} className="score-card">
+                      <h3>{item.label}</h3>
+                      <div className="progress-container">
+                        <div className="progress-fill" style={{ width: `${item.val || 0}%`, backgroundColor: getColor(item.val), boxShadow: `0 0 10px ${getColor(item.val)}` }}></div>
+                      </div>
+                      <div className="score-value" style={{ color: getColor(item.val) }}>{item.val || 0}%</div>
+                    </div>
+                  ))}
+                </div>
+
+                <button onClick={downloadPDF} className="download-btn">DOWNLOAD REPORT FILE</button>
+                <div style={{textAlign: 'center', marginTop: '10px', fontSize: '0.8rem', color: '#555'}}>
+                   SECURE RECORD SAVED TO DATABASE
+                </div>
+              </div>
+            )}
+          </main>
+        </>
+      )}
     </div>
   );
 }

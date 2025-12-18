@@ -284,3 +284,118 @@ textarea:focus, select:focus {
   fill: var(--neon-blue);
   text-anchor: middle; 
 }
+
+/* --- WAR ROOM CHAT STYLES --- */
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  height: 80vh;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #00f3ff;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+  margin-top: 20px;
+}
+
+.chat-header {
+  padding: 15px;
+  background: rgba(0, 243, 255, 0.1);
+  border-bottom: 1px solid #00f3ff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-indicator {
+  color: #00ff41;
+  font-size: 0.8rem;
+  animation: pulse 2s infinite;
+}
+
+.chat-window {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.message-row {
+  display: flex;
+  width: 100%;
+}
+
+.user-row { justify-content: flex-end; }
+.ai-row { justify-content: flex-start; }
+
+.message-bubble {
+  max-width: 70%;
+  padding: 12px 18px;
+  border-radius: 4px;
+  position: relative;
+}
+
+.user-bubble {
+  background: rgba(0, 243, 255, 0.1);
+  border: 1px solid #00f3ff;
+  color: #fff;
+  text-align: right;
+}
+
+.ai-bubble {
+  background: rgba(255, 0, 85, 0.1);
+  border: 1px solid #ff0055;
+  color: #fff;
+}
+
+.msg-sender {
+  font-size: 0.7rem;
+  font-weight: bold;
+  opacity: 0.7;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.msg-text { font-size: 1rem; line-height: 1.4; }
+.msg-time { font-size: 0.6rem; margin-top: 5px; opacity: 0.5; }
+
+.chat-input-area {
+  padding: 15px;
+  border-top: 1px solid #333;
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input-area input {
+  flex: 1;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid #333;
+  color: #fff;
+  padding: 10px;
+  font-family: 'Courier New', monospace;
+}
+
+.chat-input-area button {
+  background: #00f3ff;
+  color: #000;
+  border: none;
+  padding: 0 20px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.nav-btn {
+  background: transparent;
+  border: 1px solid #333;
+  color: #666;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif;
+  transition: 0.3s;
+}
+
+.nav-btn.active {
+  border-color: #00f3ff;
+  color: #00f3ff;
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+}

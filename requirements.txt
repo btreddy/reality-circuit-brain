@@ -1,8 +1,6 @@
 flask
 flask-cors
-google-generativeai
-reportlab
-python-dotenv
-flask-sqlalchemy
 psycopg2-binary
+openai
+tavily-python
 gunicorn
