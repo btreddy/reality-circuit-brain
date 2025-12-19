@@ -87,6 +87,7 @@ def generate_war_room_response(user_message, room_id):
             context_data = "\n[Search unavailable, answering from general knowledge]\n"
 
     # 2. Construct Prompt for Gemini
+    # 2. Construct Prompt for Gemini
     system_prompt = f"""
     You are a Strategic Consultant in 'The Innovation War Room'.
     You are collaborating with a team of business owners.
@@ -100,6 +101,13 @@ def generate_war_room_response(user_message, room_id):
     - If search data is provided, use it to give specific, grounded answers.
     - Keep responses concise, professional, and actionable.
     - Do not mention 'I am an AI'. Act like a human consultant.
+    
+    LANGUAGE & TONE RULES:
+    - Detect the language of the USER QUESTION.
+    - If the user asks in Telugu, reply in Telugu (using natural, conversational Telugu).
+    - If the user asks in Hindi, reply in Hindi.
+    - If the user uses "Hinglish" or "Teluglish" (mixed English), reply in the same mixed style.
+    - ALWAYS maintain the professional "Consultant" persona, even in local languages.
     """
     
     full_prompt = f"{system_prompt}\n\nUSER QUESTION: {user_message}"
