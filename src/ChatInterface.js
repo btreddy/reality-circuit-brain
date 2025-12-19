@@ -8,7 +8,11 @@ function ChatInterface({ senderName }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [debugError, setDebugError] = useState(null); 
+  
+  // --- NEW: Scroll State Management ---
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
+  const chatWindowRef = useRef(null); // Reference for the scrolling container
 
   useEffect(() => {
     fetchHistory();
@@ -16,21 +20,35 @@ function ChatInterface({ senderName }) {
     return () => clearInterval(interval);
   }, []);
 
+  // --- NEW: Smart Scroll Effect ---
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // Only scroll to bottom if the "permission" flag is true
+    if (shouldAutoScroll) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, shouldAutoScroll]);
+
+  // --- NEW: Scroll Listener ---
+  // Detects if the user has scrolled up to read history
+  const handleScroll = () => {
+    if (chatWindowRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatWindowRef.current;
+      // If user is within 50px of the bottom, we turn Auto-Scroll ON.
+      // If they scroll up further, we turn it OFF.
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+      setShouldAutoScroll(isAtBottom);
+    }
+  };
 
   const fetchHistory = async () => {
     try {
       const res = await fetch(`${API_URL}/api/chat/history?room_id=war_room_1`);
       const data = await res.json();
       
-      // --- CRASH PROTECTION IS HERE ---
       if (Array.isArray(data)) {
         setMessages(data);
         setDebugError(null);
       } else {
-        // If the backend sends an error, we catch it here instead of crashing
         console.error("Backend Error:", data);
         setDebugError(JSON.stringify(data)); 
       }
@@ -44,6 +62,9 @@ function ChatInterface({ senderName }) {
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    // --- NEW: Force scroll to bottom when YOU send a message ---
+    setShouldAutoScroll(true);
+
     const tempMessage = { 
       sender: senderName, 
       text: inputText, 
@@ -51,7 +72,6 @@ function ChatInterface({ senderName }) {
       timestamp: new Date().toISOString() 
     };
     
-    // Optimistic Update
     setMessages(prev => Array.isArray(prev) ? [...prev, tempMessage] : [tempMessage]);
     setInputText('');
     setLoading(true);
@@ -80,6 +100,8 @@ function ChatInterface({ senderName }) {
       console.error("Error sending message:", err);
     } finally {
       setLoading(false);
+      // Ensure we stay at bottom after AI replies too
+      setShouldAutoScroll(true);
     }
   };
 
@@ -90,17 +112,18 @@ function ChatInterface({ senderName }) {
         <span className="live-indicator">● ONLINE</span>
       </div>
 
-      {/* ERROR MESSAGE PANEL */}
       {debugError && (
         <div style={{padding: '15px', background: '#330000', borderBottom: '1px solid red', color: 'red', fontSize: '0.9rem', fontFamily: 'monospace'}}>
           ⚠️ <strong>SYSTEM ERROR:</strong> {debugError}
-          <br/><br/>
-          <em>(Tell your developer: "The backend returned this error instead of a chat list")</em>
         </div>
       )}
 
-      <div className="chat-window">
-        {/* SAFE RENDER LOOP */}
+      {/* --- NEW: Added ref={chatWindowRef} and onScroll={handleScroll} --- */}
+      <div 
+        className="chat-window" 
+        ref={chatWindowRef} 
+        onScroll={handleScroll}
+      >
         {Array.isArray(messages) && messages.map((msg, index) => (
           <div key={index} className={`message-row ${msg.is_ai ? 'ai-row' : 'user-row'}`}>
             <div className={`message-bubble ${msg.is_ai ? 'ai-bubble' : 'user-bubble'}`}>
