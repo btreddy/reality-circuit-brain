@@ -5,7 +5,8 @@ from flask_cors import CORS
 from tavily import TavilyClient
 import google.generativeai as genai
 from datetime import datetime
-
+from supabase import create_client, Client
+from werkzeug.utils import secure_filename
 # --- CONFIGURATION ---
 app = Flask(__name__)
 CORS(app)
@@ -14,7 +15,10 @@ CORS(app)
 DB_URI = os.environ.get("DATABASE_URL")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY")
-
+# Initialize Supabase Client (For File Uploads)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") # This is the "anon" public key
+supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Initialize Clients
 tavily = TavilyClient(api_key=TAVILY_API_KEY)
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -209,6 +213,39 @@ def clear_chat_history():
         conn.close()
         return jsonify({"status": "success", "message": "Room cleared"})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+# --- ROUTE 4: FILE UPLOAD ---
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    # Secure the filename and add a timestamp to prevent duplicates
+    filename = secure_filename(file.filename)
+    unique_name = f"{datetime.now().timestamp()}_{filename}"
+
+    try:
+        # Read file data
+        file_content = file.read()
+
+        # Upload to Supabase Bucket 'war-room-uploads'
+        res = supabase_client.storage.from_("war-room-uploads").upload(
+            path=unique_name, 
+            file=file_content,
+            file_options={"content-type": file.content_type}
+        )
+
+        # Get the Public Link
+        public_url = supabase_client.storage.from_("war-room-uploads").get_public_url(unique_name)
+
+        return jsonify({"url": public_url})
+
+    except Exception as e:
+        print(f"Upload Error: {e}")
         return jsonify({"error": str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True)

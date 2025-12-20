@@ -3,23 +3,24 @@ import './Main.css';
 
 const API_URL = "https://reality-circuit-brain.onrender.com"; 
 
-// 1. We now accept 'roomId' as a prop from App.js
 function ChatInterface({ senderName, roomId }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false); // NEW: Upload state
   const [debugError, setDebugError] = useState(null); 
   
-  // Scroll State
+  // Scroll & Ref Config
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
   const chatWindowRef = useRef(null); 
+  const fileInputRef = useRef(null); // NEW: Reference to hidden file input
 
   useEffect(() => {
     fetchHistory();
     const interval = setInterval(fetchHistory, 5000); 
     return () => clearInterval(interval);
-  }, [roomId]); // Refresh if room changes
+  }, [roomId]); 
 
   useEffect(() => {
     if (shouldAutoScroll) {
@@ -37,7 +38,6 @@ function ChatInterface({ senderName, roomId }) {
 
   const fetchHistory = async () => {
     try {
-      // 2. Use the dynamic roomId here!
       const res = await fetch(`${API_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
       
@@ -45,28 +45,55 @@ function ChatInterface({ senderName, roomId }) {
         setMessages(data);
         setDebugError(null);
       } else {
-        console.error("Backend Error:", data);
         setDebugError(JSON.stringify(data)); 
       }
     } catch (err) {
-      console.error("Network Error:", err);
       setDebugError(err.message);
     }
   };
 
-  // --- NEW: CLEAR ROOM FUNCTION ---
   const clearRoom = async () => {
     if(!window.confirm("WARNING: This will delete all history for this room. Are you sure?")) return;
-    
     try {
       await fetch(`${API_URL}/api/chat/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ room_id: roomId })
       });
-      setMessages([]); // Wipe screen immediately
+      setMessages([]); 
     } catch (err) {
       alert("Failed to clear room");
+    }
+  };
+
+  // --- NEW: HANDLE FILE UPLOAD ---
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      
+      if (data.url) {
+        // Automatically put the URL in the input box so user can send it
+        // We wrap it in [IMAGE] tag so we know how to render it later if we want
+        setInputText(prev => prev + " " + data.url);
+      }
+    } catch (err) {
+      alert("Upload failed. Check console.");
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+      // Reset file input so you can upload the same file again if needed
+      if(fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -92,7 +119,7 @@ function ChatInterface({ senderName, roomId }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          room_id: roomId, // 3. Send the correct Room ID
+          room_id: roomId,
           sender_name: senderName,
           message: tempMessage.text
         })
@@ -115,6 +142,23 @@ function ChatInterface({ senderName, roomId }) {
     }
   };
 
+  // --- HELPER: RENDER MESSAGE CONTENT (DETECT IMAGES) ---
+  const renderMessageContent = (text) => {
+    // Check if the text contains a Supabase Storage URL
+    if (text.includes("supabase") && (text.includes(".jpg") || text.includes(".png") || text.includes(".jpeg"))) {
+      return (
+        <div>
+          <img 
+            src={text.trim()} 
+            alt="Upload" 
+            style={{maxWidth: '100%', borderRadius: '10px', marginTop: '10px', border: '1px solid #444'}} 
+          />
+        </div>
+      );
+    }
+    return text;
+  };
+
   return (
     <div className="chat-interface">
       <div className="chat-header">
@@ -123,7 +167,6 @@ function ChatInterface({ senderName, roomId }) {
                 <h3 style={{margin:0}}>WAR ROOM: {roomId.toUpperCase()}</h3>
                 <span className="live-indicator">● ONLINE | AGENT: {senderName}</span>
             </div>
-            {/* 4. The Clear Button */}
             <button onClick={clearRoom} style={{
                 background: '#330000', border: '1px solid red', color: 'red', 
                 padding: '5px 10px', cursor: 'pointer', fontSize: '0.7rem'
@@ -134,35 +177,55 @@ function ChatInterface({ senderName, roomId }) {
       </div>
 
       {debugError && (
-        <div style={{padding: '15px', background: '#330000', borderBottom: '1px solid red', color: 'red', fontSize: '0.9rem', fontFamily: 'monospace'}}>
+        <div style={{padding: '15px', background: '#330000', borderBottom: '1px solid red', color: 'red'}}>
           ⚠️ <strong>SYSTEM ERROR:</strong> {debugError}
         </div>
       )}
 
-      <div 
-        className="chat-window" 
-        ref={chatWindowRef} 
-        onScroll={handleScroll}
-      >
+      <div className="chat-window" ref={chatWindowRef} onScroll={handleScroll}>
         {Array.isArray(messages) && messages.map((msg, index) => (
           <div key={index} className={`message-row ${msg.is_ai ? 'ai-row' : 'user-row'}`}>
             <div className={`message-bubble ${msg.is_ai ? 'ai-bubble' : 'user-bubble'}`}>
               <div className="msg-sender">{msg.sender}</div>
-              <div className="msg-text">{msg.text}</div>
+              
+              {/* RENDER TEXT OR IMAGE */}
+              <div className="msg-text">
+                {renderMessageContent(msg.text)}
+              </div>
+              
               <div className="msg-time">{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
             </div>
           </div>
         ))}
-        {loading && <div className="typing-indicator">AI Consultant is researching market data...</div>}
+        {loading && <div className="typing-indicator">AI Consultant is researching...</div>}
         <div ref={messagesEndRef} />
       </div>
 
       <form className="chat-input-area" onSubmit={sendMessage}>
+        {/* HIDDEN FILE INPUT */}
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            style={{display: 'none'}} 
+            accept="image/*,.pdf"
+        />
+        
+        {/* PAPERCLIP BUTTON */}
+        <button 
+            type="button" 
+            onClick={() => fileInputRef.current.click()}
+            disabled={isUploading}
+            style={{marginRight: '10px', background: '#333', border: '1px solid #555', color: '#fff'}}
+        >
+            {isUploading ? '⏳' : '📎'}
+        </button>
+
         <input 
           type="text" 
           value={inputText} 
           onChange={(e) => setInputText(e.target.value)} 
-          placeholder="Ask for strategy, competitor prices, or trends..." 
+          placeholder="Type message or upload file..." 
         />
         <button type="submit" disabled={loading}>SEND</button>
       </form>
