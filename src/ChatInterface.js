@@ -3,38 +3,33 @@ import './Main.css';
 
 const API_URL = "https://reality-circuit-brain.onrender.com"; 
 
-function ChatInterface({ senderName }) {
+// 1. We now accept 'roomId' as a prop from App.js
+function ChatInterface({ senderName, roomId }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [debugError, setDebugError] = useState(null); 
   
-  // --- NEW: Scroll State Management ---
+  // Scroll State
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const messagesEndRef = useRef(null);
-  const chatWindowRef = useRef(null); // Reference for the scrolling container
+  const chatWindowRef = useRef(null); 
 
   useEffect(() => {
     fetchHistory();
     const interval = setInterval(fetchHistory, 5000); 
     return () => clearInterval(interval);
-  }, []);
+  }, [roomId]); // Refresh if room changes
 
-  // --- NEW: Smart Scroll Effect ---
   useEffect(() => {
-    // Only scroll to bottom if the "permission" flag is true
     if (shouldAutoScroll) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, shouldAutoScroll]);
 
-  // --- NEW: Scroll Listener ---
-  // Detects if the user has scrolled up to read history
   const handleScroll = () => {
     if (chatWindowRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatWindowRef.current;
-      // If user is within 50px of the bottom, we turn Auto-Scroll ON.
-      // If they scroll up further, we turn it OFF.
       const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
       setShouldAutoScroll(isAtBottom);
     }
@@ -42,7 +37,8 @@ function ChatInterface({ senderName }) {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/chat/history?room_id=war_room_1`);
+      // 2. Use the dynamic roomId here!
+      const res = await fetch(`${API_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
       
       if (Array.isArray(data)) {
@@ -58,11 +54,26 @@ function ChatInterface({ senderName }) {
     }
   };
 
+  // --- NEW: CLEAR ROOM FUNCTION ---
+  const clearRoom = async () => {
+    if(!window.confirm("WARNING: This will delete all history for this room. Are you sure?")) return;
+    
+    try {
+      await fetch(`${API_URL}/api/chat/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId })
+      });
+      setMessages([]); // Wipe screen immediately
+    } catch (err) {
+      alert("Failed to clear room");
+    }
+  };
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    // --- NEW: Force scroll to bottom when YOU send a message ---
     setShouldAutoScroll(true);
 
     const tempMessage = { 
@@ -81,7 +92,7 @@ function ChatInterface({ senderName }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          room_id: 'war_room_1',
+          room_id: roomId, // 3. Send the correct Room ID
           sender_name: senderName,
           message: tempMessage.text
         })
@@ -100,7 +111,6 @@ function ChatInterface({ senderName }) {
       console.error("Error sending message:", err);
     } finally {
       setLoading(false);
-      // Ensure we stay at bottom after AI replies too
       setShouldAutoScroll(true);
     }
   };
@@ -108,8 +118,19 @@ function ChatInterface({ senderName }) {
   return (
     <div className="chat-interface">
       <div className="chat-header">
-        <h3>THE WAR ROOM // LIVE STRATEGY</h3>
-        <span className="live-indicator">● ONLINE</span>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%'}}>
+            <div>
+                <h3 style={{margin:0}}>WAR ROOM: {roomId.toUpperCase()}</h3>
+                <span className="live-indicator">● ONLINE | AGENT: {senderName}</span>
+            </div>
+            {/* 4. The Clear Button */}
+            <button onClick={clearRoom} style={{
+                background: '#330000', border: '1px solid red', color: 'red', 
+                padding: '5px 10px', cursor: 'pointer', fontSize: '0.7rem'
+            }}>
+                ⚠ WIPE MEMORY
+            </button>
+        </div>
       </div>
 
       {debugError && (
@@ -118,7 +139,6 @@ function ChatInterface({ senderName }) {
         </div>
       )}
 
-      {/* --- NEW: Added ref={chatWindowRef} and onScroll={handleScroll} --- */}
       <div 
         className="chat-window" 
         ref={chatWindowRef} 

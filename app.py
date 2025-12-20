@@ -190,6 +190,25 @@ def send_message():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+# --- ROUTE 3: CLEAR CHAT HISTORY ---
+@app.route('/api/chat/clear', methods=['POST'])
+def clear_chat_history():
+    data = request.json
+    room_id = data.get('room_id')
+    
+    if not room_id:
+        return jsonify({"error": "Room ID required"}), 400
 
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Delete chats ONLY for this specific room
+        cur.execute("DELETE FROM public.room_chats WHERE room_id = %s", (room_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "success", "message": "Room cleared"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,274 +1,63 @@
-import React, { useState, useRef } from 'react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
-import './Main.css';
-import History from './History'; 
-import ChatInterface from './ChatInterface'; // <--- IMPORT NEW COMPONENT
-
-// 🚀 LIVE BACKEND
-const API_URL = "https://reality-circuit-brain.onrender.com";
-
-// 🔐 YOUR SECRET ADMIN CODE
-const ADMIN_PIN = "8448"; 
+import React, { useState } from 'react';
+import ChatInterface from './ChatInterface'; // Ensure this path matches your file structure
+import './Main.css'; // Your CSS file
 
 function App() {
-  const [view, setView] = useState('war_room'); // Default to War Room now? Or 'scanner'
-  const [userIdea, setUserIdea] = useState('');
-  const [physicalState, setPhysicalState] = useState('neutral');
-  const [socialFeedback, setSocialFeedback] = useState('none');
-  const [emotionalState, setEmotionalState] = useState('neutral');
-  const [motivation, setMotivation] = useState('intrinsic');
+  const [roomId, setRoomId] = useState(null);
+  const [username, setUsername] = useState('');
+  const [tempRoom, setTempRoom] = useState('');
 
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const resultRef = useRef(null);
-
-  // --- SECURITY CHECK FUNCTION ---
-  const handleOpenVault = () => {
-    const input = prompt("🔐 SECURITY ALERT: ENTER ADMIN ACCESS CODE");
-    if (input === ADMIN_PIN) {
-      setView('history');
-    } else {
-      alert("❌ ACCESS DENIED: UNAUTHORIZED USER");
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    setResult(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    try {
-      const payload = {
-        user_idea: userIdea,
-        physical_state: physicalState,
-        social_feedback: socialFeedback,
-        emotional_state: emotionalState,
-        motivation: motivation
-      };
-
-      const response = await fetch(`${API_URL}/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error('Server returned an error');
-      const data = await response.json();
-      if (!data.verdict) throw new Error("Incomplete analysis.");
-      setTimeout(() => { setResult(data); }, 1500);
-
-    } catch (err) {
-      console.error(err);
-      setError('Connection Error: ' + err.message);
-    } finally {
-      if (!result) setTimeout(() => setLoading(false), 1500);
-      else setLoading(false);
-    }
+    if (!tempRoom.trim() || !username.trim()) return;
+    // Simple "Validation" - minimal security for now
+    setRoomId(tempRoom.trim().replace(/\s+/g, '_').toLowerCase()); 
   };
 
-  const downloadPDF = async () => {
-    if (!resultRef.current) return;
-    const originalStyle = resultRef.current.style.cssText;
-    resultRef.current.style.width = "800px"; 
-    resultRef.current.style.padding = "40px";
-    try {
-      const canvas = await html2canvas(resultRef.current, { scale: 2, backgroundColor: "#050505", useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Reality_Circuit_Report.pdf`);
-    } catch (err) { console.error(err); } 
-    finally { resultRef.current.style.cssText = originalStyle; }
+  const handleLogout = () => {
+    setRoomId(null);
+    setTempRoom('');
   };
 
-  const getColor = (score) => {
-    if (score >= 80) return '#00ff41'; 
-    if (score >= 50) return '#00f3ff'; 
-    return '#ff0055'; 
-  };
-
-  const renderChart = () => {
-    if (!result) return null;
-    const center = 100; const radius = 80;
-    const logic = (result.logic_score || 0) / 100 * radius;
-    const dataVal = (result.data_score || 0) / 100 * radius;
-    const money = (result.money_score || 0) / 100 * radius;
-    const ability = (result.ability_score || 0) / 100 * radius;
-    const points = `${center},${center - logic} ${center + dataVal},${center} ${center},${center + money} ${center - ability},${center}`;
-
+  if (!roomId) {
     return (
-      <div className="chart-container">
-        <svg width="200" height="200" className="radar-svg">
-          <circle cx="100" cy="100" r="20" fill="none" stroke="#222" />
-          <circle cx="100" cy="100" r="80" fill="none" stroke="#333" />
-          <line x1="100" y1="20" x2="100" y2="180" className="radar-axis" />
-          <line x1="20" y1="100" x2="180" y2="100" className="radar-axis" />
-          <polygon points={points} className="radar-shape" />
-          <text x="100" y="15" className="chart-label">LOGIC</text>
-          <text x="190" y="105" className="chart-label">DATA</text>
-          <text x="100" y="195" className="chart-label">MONEY</text>
-          <text x="10" y="105" className="chart-label">ABILITY</text>
-        </svg>
+      <div className="login-container" style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', 
+        justifyContent: 'center', height: '100vh', background: '#000', color: '#fff'
+      }}>
+        <h1 style={{color: 'var(--neon-blue)', marginBottom: '2rem'}}>SECURITY CHECK</h1>
+        <form onSubmit={handleLogin} style={{display: 'flex', flexDirection: 'column', gap: '1rem', width: '300px'}}>
+          <input 
+            type="text" 
+            placeholder="Enter Agent Name" 
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={{padding: '10px', background: '#111', border: '1px solid #333', color: '#fff'}}
+          />
+          <input 
+            type="text" 
+            placeholder="Enter Room/Secret Code" 
+            value={tempRoom}
+            onChange={(e) => setTempRoom(e.target.value)}
+            style={{padding: '10px', background: '#111', border: '1px solid #333', color: '#fff'}}
+          />
+          <button type="submit" className="cyber-button" style={{padding: '10px', background: 'var(--neon-blue)', border: 'none', cursor: 'pointer', fontWeight: 'bold'}}>
+            ENTER WAR ROOM
+          </button>
+        </form>
       </div>
     );
-  };
+  }
 
-  // --- RENDER FUNCTION ---
   return (
     <div className="app-container">
-      
-      {/* 🔹 NAVIGATION BAR 🔹 */}
-      <nav className="top-nav" style={{display: 'flex', justifyContent: 'center', gap: '20px', padding: '20px'}}>
-         <button 
-           className={view === 'war_room' ? 'nav-btn active' : 'nav-btn'} 
-           onClick={() => setView('war_room')}>
-           WAR ROOM (CHAT)
-         </button>
-         <button 
-           className={view === 'scanner' ? 'nav-btn active' : 'nav-btn'} 
-           onClick={() => setView('scanner')}>
-           SCANNER (CALCULATOR)
-         </button>
-      </nav>
-
-      {/* --- VIEW: WAR ROOM --- */}
-      {view === 'war_room' && (
-        <div className="war-room-container">
-           <ChatInterface senderName="Admin" />
-        </div>
-      )}
-
-      {/* --- VIEW: HISTORY VAULT --- */}
-      {view === 'history' && (
-        <div>
-          <header className="header">
-            <h1>REALITY CIRCUIT_v1.0</h1>
-          </header>
-          <History onBack={() => setView('scanner')} />
-        </div>
-      )}
-
-      {/* --- VIEW: SCANNER --- */}
-      {view === 'scanner' && (
-        <>
-          <button 
-                onClick={handleOpenVault}
-                style={{ 
-                  position: 'fixed', top: '20px', right: '20px', zIndex: 99999,
-                  background: 'rgba(0,0,0,0.9)', border: '2px solid #00f3ff', color: '#00f3ff',
-                  padding: '10px 15px', cursor: 'pointer', fontWeight: 'bold', fontFamily: 'Orbitron'
-                }}
-          >
-                [ OPEN VAULT ]
-          </button>
-
-          <header className="header">
-            <h1>REALITY CIRCUIT_v1.0</h1>
-            <p>AI BIAS DETECTOR & DECISION ENGINE</p>
-          </header>
-
-          <main>
-            <form onSubmit={handleSubmit}>
-              <div className="input-group">
-                <label>TARGET SUBJECT (IDEA):</label>
-                <textarea value={userIdea} onChange={(e) => setUserIdea(e.target.value)} placeholder="INPUT DATA STREAM HERE..." rows="3" required />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div className="input-group">
-                  <label>PHYSICAL:</label>
-                  <select value={physicalState} onChange={(e) => setPhysicalState(e.target.value)}>
-                    <option value="neutral">NEUTRAL</option>
-                    <option value="tired">COMPROMISED (TIRED)</option>
-                    <option value="energetic">OPTIMAL (HIGH ENERGY)</option>
-                    <option value="sick">ERROR (SICK)</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>SOCIAL:</label>
-                  <select value={socialFeedback} onChange={(e) => setSocialFeedback(e.target.value)}>
-                    <option value="none">NO DATA</option>
-                    <option value="echo_chamber">ECHO CHAMBER</option>
-                    <option value="mixed">MIXED SIGNALS</option>
-                    <option value="critical">NEGATIVE FEEDBACK</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>EMOTION:</label>
-                  <select value={emotionalState} onChange={(e) => setEmotionalState(e.target.value)}>
-                    <option value="neutral">STABLE</option>
-                    <option value="urgency">URGENCY BIAS</option>
-                    <option value="fear">FEAR STATE</option>
-                    <option value="excited">MANIC STATE</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>MOTIVE:</label>
-                  <select value={motivation} onChange={(e) => setMotivation(e.target.value)}>
-                    <option value="intrinsic">INTRINSIC</option>
-                    <option value="extrinsic">EXTRINSIC ($$)</option>
-                    <option value="desperation">SURVIVAL</option>
-                  </select>
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading} className="cyber-button">
-                {loading ? 'INITIALIZING SCAN...' : 'EXECUTE ANALYSIS'}
-              </button>
-            </form>
-
-            {loading && <div className="scanner-overlay"><div className="scan-beam"></div></div>}
-            {error && <div style={{color: '#ff0055', marginTop: '20px', textAlign: 'center'}}>{error}</div>}
-
-            {result && (
-              <div className="result-section" ref={resultRef}>
-                <div className="report-header">
-                  <div className="report-label">TARGET SUBJECT:</div>
-                  <div className="report-question">"{userIdea}"</div>
-                </div>
-
-                <div className="verdict-box" style={{ borderColor: result.verdict === 'GO' ? 'var(--neon-green)' : 'var(--neon-red)' }}>
-                  <h2 className="verdict-title" style={{ color: result.verdict === 'GO' ? 'var(--neon-green)' : 'var(--neon-red)' }}>
-                    {result.verdict}
-                  </h2>
-                  <div className="diagnosis-text">"{result.diagnosis}"</div>
-                </div>
-
-                {renderChart()}
-
-                <div className="scores-grid">
-                  {[
-                    { label: 'LOGIC', val: result.logic_score },
-                    { label: 'DATA', val: result.data_score },
-                    { label: 'MONEY', val: result.money_score },
-                    { label: 'ABILITY', val: result.ability_score }
-                  ].map((item) => (
-                    <div key={item.label} className="score-card">
-                      <h3>{item.label}</h3>
-                      <div className="progress-container">
-                        <div className="progress-fill" style={{ width: `${item.val || 0}%`, backgroundColor: getColor(item.val), boxShadow: `0 0 10px ${getColor(item.val)}` }}></div>
-                      </div>
-                      <div className="score-value" style={{ color: getColor(item.val) }}>{item.val || 0}%</div>
-                    </div>
-                  ))}
-                </div>
-
-                <button onClick={downloadPDF} className="download-btn">DOWNLOAD REPORT FILE</button>
-                <div style={{textAlign: 'center', marginTop: '10px', fontSize: '0.8rem', color: '#555'}}>
-                   SECURE RECORD SAVED TO DATABASE
-                </div>
-              </div>
-            )}
-          </main>
-        </>
-      )}
+       <button 
+         onClick={handleLogout} 
+         style={{position: 'absolute', top: '10px', right: '10px', zIndex: 1000, background: 'red', color: 'white', border: 'none', padding: '5px 10px', cursor: 'pointer'}}
+       >
+         EXIT ROOM
+       </button>
+       <ChatInterface senderName={username} roomId={roomId} />
     </div>
   );
 }
