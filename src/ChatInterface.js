@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import './Main.css';
 
 const API_URL = "https://reality-circuit-brain.onrender.com"; 
@@ -228,10 +229,21 @@ function ChatInterface({ senderName, roomId }) {
             <div className={`message-bubble ${msg.is_ai ? 'ai-bubble' : 'user-bubble'}`}>
               <div className="msg-sender">{msg.sender}</div>
               
-              {/* RENDER TEXT OR IMAGE */}
+             <div className={`message-bubble ${msg.is_ai ? 'ai-bubble' : 'user-bubble'}`}>
+              <div className="msg-sender">{msg.sender}</div>
+              
+              {/* --- THIS IS THE PART TO REPLACE --- */}
               <div className="msg-text">
-                {renderMessageContent(msg.text)}
+                {msg.text.includes("supabase") && (msg.text.includes(".jpg") || msg.text.includes(".png")) ? (
+                    renderMessageContent(msg.text)
+                ) : (
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                )}
               </div>
+              {/* ---------------------------------- */}
+              
+              <div className="msg-time">{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+            </div>
               
               <div className="msg-time">{new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
             </div>
