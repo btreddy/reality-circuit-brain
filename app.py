@@ -182,37 +182,35 @@ def send_chat():
             return jsonify({"error": str(e)}), 500
 
     # 2. DECIDE: Should the AI reply?
-    # RULE A: Reply if it's the Welcome Trigger
-    # RULE B: Reply if it's the "AI Assist" Button (SYSTEM_COMMAND)
-    # RULE C: Reply ONLY if the user explicitly types "@AI", "AI Consultant", or "Consultant"
-    
     triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
-    is_addressed = any(t in message_text.lower() for t in triggers)
+    
+    # NEW: Check for our secret Tactical Buttons code
+    is_command = "execute option" in message_text.lower()
+    
+    is_addressed = any(t in message_text.lower() for t in triggers) or is_command
     
     should_reply = False
     ai_prompt = ""
 
     if sender_name == "SYSTEM_WELCOME":
         should_reply = True
-        ai_prompt = f"You are an expert Strategic Consultant. The user '{message_text}' has just entered the 'War Room'. Give them a very short, professional, high-energy welcome message. Confirm you are ready to assist with data or strategy."
+        ai_prompt = f"You are an expert Strategic Consultant. The user '{message_text}' has just entered the 'War Room'. Give them a very short, professional, high-energy welcome message."
     
     elif sender_name == "SYSTEM_COMMAND":
         should_reply = True
-        ai_prompt = message_text # Use the prompt from the button directly
+        ai_prompt = message_text 
         
-    elif is_addressed:
+    elif is_addressed: # This now includes our "is_command" check
         should_reply = True
-        # Fetch history for context
         history = get_chat_history(room_id)
         context_str = "\n".join([f"{msg['sender']}: {msg['text']}" for msg in history[-10:]])
         ai_prompt = f"""
-        Context of conversation:
-        {context_str}
-        
+        Context: {context_str}
         User Query: {message_text}
         
         You are an expert Real Estate & Business Strategy Consultant. 
-        Answer the user's query specifically. Be professional, concise, and strategic.
+        If the user text contains "EXECUTE OPTION 1" (or 2/3), look at your PREVIOUS suggestion in the history and strictly perform that specific analysis.
+        Otherwise, answer the user's query professionally.
         """
 
     # 3. IF NO TRIGGER, RETURN SILENTLY (Stop here)
