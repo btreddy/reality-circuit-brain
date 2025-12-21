@@ -9,7 +9,10 @@ function ChatInterface({ senderName, roomId }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [debugError, setDebugError] = useState(null); 
+  const [debugError, setDebugError] = useState(null);
+  
+  // NEW: A "Safety Lock" to stop the DB from wiping the screen too early
+  const [blockRefresh, setBlockRefresh] = useState(false);
   
   // Scroll & Ref Config
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -17,22 +20,23 @@ function ChatInterface({ senderName, roomId }) {
   const chatWindowRef = useRef(null); 
   const fileInputRef = useRef(null); 
 
-  // --- 1. WELCOME TRIGGER (STABLE VERSION) ---
+  // --- 1. WELCOME TRIGGER (WITH SAFETY LOCK) ---
   useEffect(() => {
-    // Wait until we definitely have the Name and Room ID
     if (!senderName || !roomId) return;
 
     const triggerWelcome = async () => {
-      // Check session storage so we don't welcome twice in one session
+      // Check session to avoid double welcome
       const sessionKey = `welcomed_${roomId}_${senderName}`;
       if (sessionStorage.getItem(sessionKey)) return;
 
       try {
-        // Mark as done immediately
         sessionStorage.setItem(sessionKey, 'true');
+        
+        // LOCK THE REFRESH: Stop fetchHistory from running for 5 seconds
+        setBlockRefresh(true);
+        setLoading(true);
 
-        // Send the signal to the Brain
-        await fetch(`${API_URL}/api/chat/send`, {
+        const res = await fetch(`${API_URL}/api/chat/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -42,14 +46,28 @@ function ChatInterface({ senderName, roomId }) {
           })
         });
 
-        // FIX: Wait 1.5 seconds for the DB to save, THEN fetch history
-        // This prevents the "Flash and Disappear" glitch
+        const data = await res.json();
+        
+        // Show message immediately (Optimistic UI)
+        if (data.ai_reply) {
+            setMessages(prev => [...prev, {
+                sender: "AI Consultant",
+                text: data.ai_reply,
+                is_ai: true,
+                timestamp: new Date().toISOString()
+            }]);
+        }
+        
+        // UNLOCK after 5 seconds (Giving DB time to save)
         setTimeout(() => {
-            fetchHistory();
-        }, 1500);
+            setBlockRefresh(false);
+            setLoading(false);
+        }, 5000);
 
       } catch (err) {
         console.error("Welcome trigger failed", err);
+        setBlockRefresh(false);
+        setLoading(false);
       }
     };
 
@@ -58,10 +76,16 @@ function ChatInterface({ senderName, roomId }) {
 
   // --- 2. FETCH HISTORY LOOP ---
   useEffect(() => {
+    // If the Lock is ON, do not fetch!
+    if (blockRefresh) return;
+
     fetchHistory();
-    const interval = setInterval(fetchHistory, 5000); 
+    const interval = setInterval(() => {
+        if (!blockRefresh) fetchHistory();
+    }, 5000); 
+    
     return () => clearInterval(interval);
-  }, [roomId]); 
+  }, [roomId, blockRefresh]); // Re-run if lock status changes
 
   // --- 3. AUTO SCROLL ---
   useEffect(() => {
@@ -79,6 +103,9 @@ function ChatInterface({ senderName, roomId }) {
   };
 
   const fetchHistory = async () => {
+    // Double check lock
+    if (blockRefresh) return;
+
     try {
       const res = await fetch(`${API_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
@@ -103,7 +130,6 @@ function ChatInterface({ senderName, roomId }) {
         body: JSON.stringify({ room_id: roomId })
       });
       setMessages([]); 
-      // Clear the welcome memory too, so it welcomes you again if you refresh
       sessionStorage.removeItem(`welcomed_${roomId}_${senderName}`);
     } catch (err) {
       alert("Failed to clear room");
@@ -147,12 +173,12 @@ function ChatInterface({ senderName, roomId }) {
           message: prompt
         })
       });
-      // Force a fetch after 1 second to show the question (if needed) or wait for reply
-      setTimeout(fetchHistory, 1000);
-      
+      // Pause fetching briefly to let AI reply save
+      setBlockRefresh(true);
+      setTimeout(() => setBlockRefresh(false), 3000);
+
       const data = await res.json();
       if (data.ai_reply) {
-        // Manually add AI reply to UI for instant feedback
         setMessages(prev => Array.isArray(prev) ? [...prev, {
           sender: "AI Consultant",
           text: data.ai_reply,
@@ -206,7 +232,6 @@ function ChatInterface({ senderName, roomId }) {
       timestamp: new Date().toISOString() 
     };
     
-    // Optimistic UI Update (Show message immediately)
     setMessages(prev => Array.isArray(prev) ? [...prev, tempMessage] : [tempMessage]);
     setInputText('');
     setLoading(true);
@@ -221,6 +246,10 @@ function ChatInterface({ senderName, roomId }) {
           message: tempMessage.text
         })
       });
+      
+      // Pause refresh briefly so we don't wipe our own message
+      setBlockRefresh(true);
+      setTimeout(() => setBlockRefresh(false), 2000);
 
       const data = await res.json();
       if (data.ai_reply) {
@@ -260,7 +289,6 @@ function ChatInterface({ senderName, roomId }) {
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%'}}>
             <div>
                 <h3 style={{margin:0}}>WAR ROOM: {roomId.toUpperCase()}</h3>
-                {/* UPDATED LABEL HERE */}
                 <span className="live-indicator">● ONLINE | WARRIOR: {senderName}</span>
             </div>
             <div>
