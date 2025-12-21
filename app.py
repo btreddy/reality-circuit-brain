@@ -16,14 +16,19 @@ def get_db_connection():
 # 2. GEMINI CONFIGURATION
 genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
 
-# 3. SETUP DATABASE TABLE (Run this once if needed)
-@app.route('/api/setup', methods=['GET'])
-def setup_db():
+# --- NEW: THE REPAIR KIT (RUN THIS ONCE) ---
+@app.route('/api/fix_db', methods=['GET'])
+def fix_database_schema():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # 1. Nuclear Option: Drop the old table that is missing columns
+        cur.execute("DROP TABLE IF EXISTS room_chats;")
+        
+        # 2. Re-create it with the correct "timestamp" column
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS room_chats (
+            CREATE TABLE room_chats (
                 id SERIAL PRIMARY KEY,
                 room_id TEXT NOT NULL,
                 sender_name TEXT NOT NULL,
@@ -32,27 +37,26 @@ def setup_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({"status": "Database Ready!"})
+        return "<h1>✅ DATABASE REPAIRED!</h1> <p>The 'timestamp' column has been added. You can close this tab and return to the War Room.</p>"
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return f"<h1>❌ ERROR:</h1> <p>{str(e)}</p>"
 
-# 4. HISTORY ENDPOINT
+# 3. HISTORY ENDPOINT
 @app.route('/api/chat/history', methods=['GET'])
 def get_chat_history():
     room_id = request.args.get('room_id')
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Order by timestamp so older messages come first
         cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
         rows = cur.fetchall()
         cur.close()
         conn.close()
         
-        # Format for Frontend
         messages = []
         for row in rows:
             messages.append({
@@ -65,7 +69,7 @@ def get_chat_history():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 5. SEND MESSAGE & AI BRAIN (THE CRITICAL FIX)
+# 4. SEND MESSAGE (Smart & Clean)
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -73,9 +77,7 @@ def send_chat():
     sender_name = data.get('sender_name')
     message_text = data.get('message', '')
 
-    # --- CRITICAL FIX: DO NOT SAVE SYSTEM COMMANDS TO DB ---
-    # We only save "Real" human messages. 
-    # We IGNORE "SYSTEM_COMMAND" (Hidden prompts) and "SYSTEM_WELCOME" (Hidden triggers)
+    # SAVE HUMAN MESSAGE (Ignore System Commands)
     if sender_name not in ["SYSTEM_COMMAND", "SYSTEM_WELCOME"]:
         try:
             conn = get_db_connection()
@@ -90,69 +92,52 @@ def send_chat():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    # --- AI LOGIC ---
+    # AI LOGIC
     should_reply = False
     ai_prompt = ""
 
-    # 1. Welcome Trigger
     if sender_name == "SYSTEM_WELCOME":
         should_reply = True
         ai_prompt = f"You are an expert Strategic Consultant. The user '{message_text}' has just entered the 'War Room'. Give them a very short, professional, high-energy welcome message."
 
-    # 2. System Command (The "AI Assist" Button)
     elif sender_name == "SYSTEM_COMMAND":
         should_reply = True
-        ai_prompt = message_text  # Use the hidden prompt exactly as sent
+        ai_prompt = message_text
 
-    # 3. Human Chat Trigger (Mentions @AI or uses "EXECUTE OPTION")
     else:
+        # Check for Triggers
         triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
-        is_addressed = any(t in message_text.lower() for t in triggers)
-        
-        # Check for the secret button code
         is_command = "execute option" in message_text.lower()
+        is_addressed = any(t in message_text.lower() for t in triggers) or is_command
         
-        if is_addressed or is_command:
+        if is_addressed:
             should_reply = True
-            
-            # Fetch Context (Last 15 messages)
             try:
+                # Fetch context
                 conn = get_db_connection()
                 cur = conn.cursor(cursor_factory=RealDictCursor)
                 cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC LIMIT 15", (room_id,))
-                history_rows = cur.fetchall()
+                rows = cur.fetchall()
                 cur.close()
                 conn.close()
-                
-                context_str = "\n".join([f"{row['sender_name']}: {row['message']}" for row in history_rows])
+                context_str = "\n".join([f"{r['sender_name']}: {r['message']}" for r in rows])
             except:
-                context_str = "No history available."
+                context_str = ""
 
             ai_prompt = f"""
-            You are a Real Estate Strategy Consultant.
-            
-            CONTEXT OF CONVERSATION:
-            {context_str}
-            
-            USER MESSAGE: {message_text}
-            
-            INSTRUCTIONS:
-            - If the user said "EXECUTE OPTION X", look at the history, find that option, and perform the analysis in detail.
-            - If the user asked a question, answer it strategically.
-            - Keep formatting clean (Use Bullet points).
+            Context: {context_str}
+            User: {message_text}
+            You are a Strategy Consultant. If the user says "EXECUTE OPTION", perform the analysis. Otherwise, answer the question.
             """
 
-    # --- IF NO AI TRIGGER, STOP HERE ---
     if not should_reply:
-        return jsonify({"status": "Message stored (Silent)"})
+        return jsonify({"status": "Stored"})
 
-    # --- IF TRIGGERED, CALL GEMINI ---
     try:
         model = genai.GenerativeModel('gemini-pro')
         response = model.generate_content(ai_prompt)
         ai_reply = response.text
         
-        # Save AI Reply to DB
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
@@ -162,22 +147,19 @@ def send_chat():
         conn.commit()
         cur.close()
         conn.close()
-        
         return jsonify({"ai_reply": ai_reply})
 
     except Exception as e:
-        print(f"AI Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# 6. CLEAR MEMORY
+# 5. CLEAR ROOM
 @app.route('/api/chat/clear', methods=['POST'])
 def clear_room():
     data = request.json
-    room_id = data.get('room_id')
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
+        cur.execute("DELETE FROM room_chats WHERE room_id = %s", (data.get('room_id'),))
         conn.commit()
         cur.close()
         conn.close()
@@ -185,10 +167,8 @@ def clear_room():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 7. UPLOAD (Simple Version)
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
-    # You are using Supabase storage in frontend, or if you need a placeholder:
     return jsonify({"url": "[FILE UPLOADED]"})
 
 if __name__ == '__main__':
