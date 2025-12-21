@@ -192,7 +192,21 @@ def send_chat():
     should_reply = False
     ai_prompt = ""
 
-    if sender_name == "SYSTEM_WELCOME":
+    # 1. Save the HUMAN's message to the database
+    # FIX: We now block BOTH "SYSTEM_WELCOME" and "SYSTEM_COMMAND" from being saved
+    if sender_name not in ["SYSTEM_WELCOME", "SYSTEM_COMMAND"]:
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)",
+                (room_id, sender_name, message_text, False)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
         should_reply = True
         ai_prompt = f"You are an expert Strategic Consultant. The user '{message_text}' has just entered the 'War Room'. Give them a very short, professional, high-energy welcome message."
     
