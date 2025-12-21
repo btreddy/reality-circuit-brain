@@ -17,13 +17,13 @@ function ChatInterface({ senderName, roomId }) {
   const chatWindowRef = useRef(null); 
   const fileInputRef = useRef(null); 
 
-  /// --- 1. WELCOME TRIGGER (FIXED: Waits for Name) ---
+  // --- 1. WELCOME TRIGGER (STABLE VERSION) ---
   useEffect(() => {
-    // CRITICAL FIX: If we don't have the name yet, do nothing. Wait.
+    // Wait until we definitely have the Name and Room ID
     if (!senderName || !roomId) return;
 
     const triggerWelcome = async () => {
-      // Check session storage so we don't welcome twice
+      // Check session storage so we don't welcome twice in one session
       const sessionKey = `welcomed_${roomId}_${senderName}`;
       if (sessionStorage.getItem(sessionKey)) return;
 
@@ -31,7 +31,8 @@ function ChatInterface({ senderName, roomId }) {
         // Mark as done immediately
         sessionStorage.setItem(sessionKey, 'true');
 
-        const res = await fetch(`${API_URL}/api/chat/send`, {
+        // Send the signal to the Brain
+        await fetch(`${API_URL}/api/chat/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -41,32 +42,28 @@ function ChatInterface({ senderName, roomId }) {
           })
         });
 
-        const data = await res.json();
-        
-        if (data.ai_reply) {
-            setMessages(prev => [...prev, {
-                sender: "AI Consultant",
-                text: data.ai_reply,
-                is_ai: true,
-                timestamp: new Date().toISOString()
-            }]);
-        }
+        // FIX: Wait 1.5 seconds for the DB to save, THEN fetch history
+        // This prevents the "Flash and Disappear" glitch
+        setTimeout(() => {
+            fetchHistory();
+        }, 1500);
+
       } catch (err) {
         console.error("Welcome trigger failed", err);
       }
     };
 
     triggerWelcome();
-    // The fix is here: we add [senderName] so it runs again once the name loads
-  }, [senderName, roomId]);
-  // --- 2. FETCH HISTORY (Runs on Interval) ---
+  }, [senderName, roomId]); 
+
+  // --- 2. FETCH HISTORY LOOP ---
   useEffect(() => {
     fetchHistory();
     const interval = setInterval(fetchHistory, 5000); 
     return () => clearInterval(interval);
   }, [roomId]); 
 
-  // --- 3. AUTO SCROLL (Runs when messages change) ---
+  // --- 3. AUTO SCROLL ---
   useEffect(() => {
     if (shouldAutoScroll) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -106,6 +103,8 @@ function ChatInterface({ senderName, roomId }) {
         body: JSON.stringify({ room_id: roomId })
       });
       setMessages([]); 
+      // Clear the welcome memory too, so it welcomes you again if you refresh
+      sessionStorage.removeItem(`welcomed_${roomId}_${senderName}`);
     } catch (err) {
       alert("Failed to clear room");
     }
@@ -120,7 +119,7 @@ function ChatInterface({ senderName, roomId }) {
     const rows = messages.map(msg => {
       const cleanText = `"${msg.text.replace(/"/g, '""')}"`; 
       const time = new Date(msg.timestamp).toLocaleString();
-      const type = msg.is_ai ? "AI Consultant" : "Human Agent";
+      const type = msg.is_ai ? "AI Consultant" : "Human Warrior";
       return [time, msg.sender, type, cleanText].join(",");
     });
     const csvContent = [headers.join(","), ...rows].join("\n");
@@ -148,8 +147,12 @@ function ChatInterface({ senderName, roomId }) {
           message: prompt
         })
       });
+      // Force a fetch after 1 second to show the question (if needed) or wait for reply
+      setTimeout(fetchHistory, 1000);
+      
       const data = await res.json();
       if (data.ai_reply) {
+        // Manually add AI reply to UI for instant feedback
         setMessages(prev => Array.isArray(prev) ? [...prev, {
           sender: "AI Consultant",
           text: data.ai_reply,
@@ -203,6 +206,7 @@ function ChatInterface({ senderName, roomId }) {
       timestamp: new Date().toISOString() 
     };
     
+    // Optimistic UI Update (Show message immediately)
     setMessages(prev => Array.isArray(prev) ? [...prev, tempMessage] : [tempMessage]);
     setInputText('');
     setLoading(true);
@@ -256,6 +260,7 @@ function ChatInterface({ senderName, roomId }) {
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%'}}>
             <div>
                 <h3 style={{margin:0}}>WAR ROOM: {roomId.toUpperCase()}</h3>
+                {/* UPDATED LABEL HERE */}
                 <span className="live-indicator">● ONLINE | WARRIOR: {senderName}</span>
             </div>
             <div>
