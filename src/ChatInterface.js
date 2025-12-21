@@ -17,19 +17,37 @@ function ChatInterface({ senderName, roomId }) {
   const chatWindowRef = useRef(null); 
   const fileInputRef = useRef(null); 
 
-  // --- 1. WELCOME TRIGGER (Runs Once) ---
+  // --- 1. WELCOME TRIGGER (UPDATED) ---
   useEffect(() => {
     const triggerWelcome = async () => {
+      // Check if we already welcomed this user in this session to prevent duplicates
+      const hasWelcomed = sessionStorage.getItem(`welcomed_${roomId}_${senderName}`);
+      if (hasWelcomed) return;
+
       try {
-        await fetch(`${API_URL}/api/chat/send`, {
+        const res = await fetch(`${API_URL}/api/chat/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             room_id: roomId,
-            sender_name: "SYSTEM_WELCOME", // Special Flag
+            sender_name: "SYSTEM_WELCOME", 
             message: senderName 
           })
         });
+
+        const data = await res.json();
+        
+        // IMMEDIATE UPDATE: Show the welcome message right now!
+        if (data.ai_reply) {
+            setMessages(prev => [...prev, {
+                sender: "AI Consultant",
+                text: data.ai_reply,
+                is_ai: true,
+                timestamp: new Date().toISOString()
+            }]);
+            // Mark as done so it doesn't happen again on refresh
+            sessionStorage.setItem(`welcomed_${roomId}_${senderName}`, 'true');
+        }
       } catch (err) {
         console.error("Welcome trigger failed", err);
       }
@@ -39,7 +57,7 @@ function ChatInterface({ senderName, roomId }) {
         triggerWelcome();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []);
 
   // --- 2. FETCH HISTORY (Runs on Interval) ---
   useEffect(() => {

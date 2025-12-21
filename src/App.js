@@ -29,7 +29,7 @@ function App() {
         <form onSubmit={handleLogin} style={{display: 'flex', flexDirection: 'column', gap: '1rem', width: '300px'}}>
           <input 
             type="text" 
-            placeholder="Enter Agent Name" 
+            placeholder="Enter Warrior Name" 
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             style={{padding: '10px', background: '#111', border: '1px solid #333', color: '#fff'}}
