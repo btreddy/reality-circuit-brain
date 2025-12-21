@@ -19,6 +19,33 @@ function ChatInterface({ senderName, roomId }) {
 
   useEffect(() => {
     fetchHistory();
+    // --- NEW: TRIGGER WELCOME MESSAGE ON ENTRY ---
+  useEffect(() => {
+    // We send a hidden signal to the brain saying "I am here"
+    const triggerWelcome = async () => {
+      try {
+        await fetch(`${API_URL}/api/chat/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            room_id: roomId,
+            sender_name: "SYSTEM_WELCOME", // Special Flag
+            message: senderName // We send the name so AI knows who to greet
+          })
+        });
+        // We don't need to do anything with the response here. 
+        // The fetchHistory() interval will pick up the Welcome message automatically in a second.
+      } catch (err) {
+        console.error("Welcome trigger failed", err);
+      }
+    };
+
+    // Only trigger if we have a senderName
+    if (senderName) {
+        triggerWelcome();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // The empty [] means this runs ONLY ONCE when you open the page
     const interval = setInterval(fetchHistory, 5000); 
     return () => clearInterval(interval);
   }, [roomId]); 

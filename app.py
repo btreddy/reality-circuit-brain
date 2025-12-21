@@ -156,19 +156,90 @@ def get_chat_history():
         return jsonify({"error": str(e)}), 500
 
 # --- ROUTE 2: SEND MESSAGE ---
+# --- REPLACE THE 'send_chat' FUNCTION WITH THIS ---
+
 @app.route('/api/chat/send', methods=['POST'])
-def send_message():
+def send_chat():
     data = request.json
-    room_id = data.get('room_id', 'default_room')
-    user_message = data.get('message')
-    sender_name = data.get('sender_name', 'User')
+    room_id = data.get('room_id')
+    sender_name = data.get('sender_name')
+    message_text = data.get('message', '')
 
-    if not user_message:
-        return jsonify({"error": "No message provided"}), 400
+    # 1. Save the HUMAN's message to the database (Unless it's a hidden system trigger)
+    # We don't save "User entered room" messages to keep the chat clean
+    if sender_name != "SYSTEM_WELCOME":
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)",
+                (room_id, sender_name, message_text, False)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
+    # 2. DECIDE: Should the AI reply?
+    # RULE A: Reply if it's the Welcome Trigger
+    # RULE B: Reply if it's the "AI Assist" Button (SYSTEM_COMMAND)
+    # RULE C: Reply ONLY if the user explicitly types "@AI", "AI Consultant", or "Consultant"
+    
+    triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
+    is_addressed = any(t in message_text.lower() for t in triggers)
+    
+    should_reply = False
+    ai_prompt = ""
+
+    if sender_name == "SYSTEM_WELCOME":
+        should_reply = True
+        ai_prompt = f"You are an expert Strategic Consultant. The user '{message_text}' has just entered the 'War Room'. Give them a very short, professional, high-energy welcome message. Confirm you are ready to assist with data or strategy."
+    
+    elif sender_name == "SYSTEM_COMMAND":
+        should_reply = True
+        ai_prompt = message_text # Use the prompt from the button directly
+        
+    elif is_addressed:
+        should_reply = True
+        # Fetch history for context
+        history = get_chat_history(room_id)
+        context_str = "\n".join([f"{msg['sender']}: {msg['text']}" for msg in history[-10:]])
+        ai_prompt = f"""
+        Context of conversation:
+        {context_str}
+        
+        User Query: {message_text}
+        
+        You are an expert Real Estate & Business Strategy Consultant. 
+        Answer the user's query specifically. Be professional, concise, and strategic.
+        """
+
+    # 3. IF NO TRIGGER, RETURN SILENTLY (Stop here)
+    if not should_reply:
+        return jsonify({"status": "stored_silent"})
+
+    # 4. IF TRIGGERED, CALL GEMINI
     try:
+        response = genai.GenerativeModel('gemini-pro').generate_content(ai_prompt)
+        ai_reply = response.text
+        
+        # Save AI Reply to DB
         conn = get_db_connection()
         cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)",
+            (room_id, sender_name, ai_reply, True) # Storing AI reply
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"ai_reply": ai_reply})
+
+    except Exception as e:
+        print(f"AI Error: {e}")
+        return jsonify({"error": str(e)}), 500
 
         # 1. Save User Message
         cur.execute(
