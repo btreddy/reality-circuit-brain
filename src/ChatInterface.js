@@ -17,11 +17,8 @@ function ChatInterface({ senderName, roomId }) {
   const chatWindowRef = useRef(null); 
   const fileInputRef = useRef(null); 
 
+  // --- 1. WELCOME TRIGGER (Runs Once) ---
   useEffect(() => {
-    fetchHistory();
-    // --- NEW: TRIGGER WELCOME MESSAGE ON ENTRY ---
-  useEffect(() => {
-    // We send a hidden signal to the brain saying "I am here"
     const triggerWelcome = async () => {
       try {
         await fetch(`${API_URL}/api/chat/send`, {
@@ -30,26 +27,28 @@ function ChatInterface({ senderName, roomId }) {
           body: JSON.stringify({
             room_id: roomId,
             sender_name: "SYSTEM_WELCOME", // Special Flag
-            message: senderName // We send the name so AI knows who to greet
+            message: senderName 
           })
         });
-        // We don't need to do anything with the response here. 
-        // The fetchHistory() interval will pick up the Welcome message automatically in a second.
       } catch (err) {
         console.error("Welcome trigger failed", err);
       }
     };
 
-    // Only trigger if we have a senderName
     if (senderName) {
         triggerWelcome();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // The empty [] means this runs ONLY ONCE when you open the page
+  }, []); 
+
+  // --- 2. FETCH HISTORY (Runs on Interval) ---
+  useEffect(() => {
+    fetchHistory();
     const interval = setInterval(fetchHistory, 5000); 
     return () => clearInterval(interval);
   }, [roomId]); 
 
+  // --- 3. AUTO SCROLL (Runs when messages change) ---
   useEffect(() => {
     if (shouldAutoScroll) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
