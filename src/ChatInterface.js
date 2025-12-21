@@ -65,6 +65,39 @@ function ChatInterface({ senderName, roomId }) {
       alert("Failed to clear room");
     }
   };
+  // --- NEW: EXPORT CHAT TO CSV ---
+  const exportChat = () => {
+    if (messages.length === 0) {
+      alert("No messages to export!");
+      return;
+    }
+
+    // 1. Setup Headers
+    const headers = ["Timestamp", "Sender", "Message Type", "Content"];
+    
+    // 2. Format Data
+    const rows = messages.map(msg => {
+      // Clean up text to prevent CSV errors (replace commas and quotes)
+      const cleanText = `"${msg.text.replace(/"/g, '""')}"`; 
+      const time = new Date(msg.timestamp).toLocaleString();
+      const type = msg.is_ai ? "AI Consultant" : "Human Agent";
+      
+      return [time, msg.sender, type, cleanText].join(",");
+    });
+
+    // 3. Create File
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // 4. Trigger Download
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `WarRoom_Log_${roomId}_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // --- NEW: HANDLE FILE UPLOAD ---
   const handleFileUpload = async (e) => {
@@ -167,6 +200,13 @@ function ChatInterface({ senderName, roomId }) {
                 <h3 style={{margin:0}}>WAR ROOM: {roomId.toUpperCase()}</h3>
                 <span className="live-indicator">● ONLINE | AGENT: {senderName}</span>
             </div>
+            {/* EXPORT BUTTON */}
+            <button onClick={exportChat} style={{
+                background: '#004400', border: '1px solid #00ff00', color: '#00ff00', 
+                padding: '5px 10px', cursor: 'pointer', fontSize: '0.7rem', marginRight: '10px'
+            }}>
+                ⬇ SAVE REPORT
+            </button>
             <button onClick={clearRoom} style={{
                 background: '#330000', border: '1px solid red', color: 'red', 
                 padding: '5px 10px', cursor: 'pointer', fontSize: '0.7rem'
