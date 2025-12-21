@@ -4,16 +4,45 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 import google.generativeai as genai
+import time
 
 app = Flask(__name__)
 CORS(app)
 
+# 1. CONFIGURATION
 def get_db_connection():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
 
-# --- AUTO-REPAIR (Keep this, it protects you) ---
+# --- THE UNSTOPPABLE BRAIN FUNCTION ---
+def generate_smart_content(prompt):
+    """
+    Tries multiple models in order. If one fails (quota/error), 
+    it automatically switches to the next one.
+    """
+    # The Hierarchy of Brains (Best to Backup)
+    models_to_try = [
+        'gemini-2.0-flash-exp',  # 1. Newest & Fastest
+        'gemini-1.5-flash',      # 2. Reliable Standard
+        'gemini-1.5-pro'         # 3. Heavy Duty Fallback
+    ]
+
+    for model_name in models_to_try:
+        try:
+            print(f"🧠 Trying Brain: {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text # Success! Return the answer.
+        except Exception as e:
+            print(f"⚠️ {model_name} Failed: {e}")
+            # If it's a quota error (429) or not found (404), we continue to the next model.
+            continue
+    
+    # If ALL models fail, then we return the error
+    raise Exception("All AI Brains are currently busy or offline. Please try again in 1 minute.")
+
+# 2. AUTO-REPAIR (DB Health)
 def nuclear_fix_db():
     try:
         conn = get_db_connection()
@@ -37,6 +66,7 @@ def nuclear_fix_db():
     except Exception as e:
         print(f"❌ REPAIR FAILED: {e}")
 
+# 3. HISTORY ENDPOINT
 @app.route('/api/chat/history', methods=['GET'])
 def get_chat_history():
     room_id = request.args.get('room_id')
@@ -62,6 +92,7 @@ def get_chat_history():
             return jsonify([])
         return jsonify({"error": str(e)}), 500
 
+# 4. SEND MESSAGE ENDPOINT
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -69,7 +100,7 @@ def send_chat():
     sender_name = data.get('sender_name')
     message_text = data.get('message', '')
 
-    # 1. SAVE HUMAN MESSAGE
+    # SAVE HUMAN MESSAGE
     if sender_name not in ["SYSTEM_COMMAND", "SYSTEM_WELCOME"]:
         try:
             conn = get_db_connection()
@@ -85,7 +116,7 @@ def send_chat():
             if "does not exist" in str(e): nuclear_fix_db()
             return jsonify({"error": str(e)}), 500
 
-    # 2. DECIDE IF AI SHOULD REPLY
+    # DECIDE IF AI SHOULD REPLY
     should_reply = False
     ai_prompt = ""
 
@@ -118,26 +149,16 @@ def send_chat():
     if not should_reply:
         return jsonify({"status": "Stored"})
 
-    # 3. CALL GEMINI (WITH SAFETY NET)
+    # CALL THE UNSTOPPABLE BRAIN
     try:
-        # Try the newer model first, it is more stable
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(ai_prompt)
-        except:
-            # Fallback to pro if flash fails
-            model = genai.GenerativeModel('gemini-pro')
-            response = model.generate_content(ai_prompt)
-            
-        ai_reply = response.text
+        # Use our new smarter function that tries multiple models
+        ai_reply = generate_smart_content(ai_prompt)
         
     except Exception as e:
-        # !!! HERE IS THE FIX !!!
-        # Instead of crashing (500), we capture the error and send it to the chat.
-        print(f"AI ERROR: {e}")
-        ai_reply = f"⚠️ SYSTEM ERROR: {str(e)}"
+        print(f"ALL AI FAILED: {e}")
+        ai_reply = f"⚠️ SYSTEM ERROR: All AI circuits busy. {str(e)}"
 
-    # 4. SAVE AI REPLY (Even if it's an error message)
+    # SAVE AI REPLY
     try:
         conn = get_db_connection()
         cur = conn.cursor()
