@@ -8,25 +8,20 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# 1. DATABASE CONNECTION
+# --- CONFIGURATION ---
 def get_db_connection():
-    conn = psycopg2.connect(os.environ['DATABASE_URL'])
-    return conn
+    return psycopg2.connect(os.environ['DATABASE_URL'])
 
-# 2. GEMINI CONFIGURATION
 genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
 
-# --- NEW: THE REPAIR KIT (RUN THIS ONCE) ---
-@app.route('/api/fix_db', methods=['GET'])
-def fix_database_schema():
+# --- AUTO-REPAIR FUNCTION ---
+def nuclear_fix_db():
+    """Drops the old broken table and creates the new one with timestamp."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
-        # 1. Nuclear Option: Drop the old table that is missing columns
+        print("⚠️ DETECTED BROKEN DB. RUNNING NUCLEAR REPAIR...")
         cur.execute("DROP TABLE IF EXISTS room_chats;")
-        
-        # 2. Re-create it with the correct "timestamp" column
         cur.execute("""
             CREATE TABLE room_chats (
                 id SERIAL PRIMARY KEY,
@@ -37,39 +32,46 @@ def fix_database_schema():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
-        
         conn.commit()
         cur.close()
         conn.close()
-        return "<h1>✅ DATABASE REPAIRED!</h1> <p>The 'timestamp' column has been added. You can close this tab and return to the War Room.</p>"
+        print("✅ DATABASE REPAIRED SUCCESSFULLY.")
     except Exception as e:
-        return f"<h1>❌ ERROR:</h1> <p>{str(e)}</p>"
+        print(f"❌ REPAIR FAILED: {e}")
 
-# 3. HISTORY ENDPOINT
+# --- HISTORY ENDPOINT (WITH AUTO-HEALING) ---
 @app.route('/api/chat/history', methods=['GET'])
 def get_chat_history():
     room_id = request.args.get('room_id')
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Try to select using the NEW schema (with timestamp)
         cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
         rows = cur.fetchall()
         cur.close()
         conn.close()
         
-        messages = []
-        for row in rows:
-            messages.append({
-                "sender": row['sender_name'],
-                "text": row['message'],
-                "is_ai": row['is_ai'],
-                "timestamp": row['timestamp']
-            })
+        messages = [{
+            "sender": row['sender_name'], 
+            "text": row['message'], 
+            "is_ai": row['is_ai'], 
+            "timestamp": row['timestamp']
+        } for row in rows]
+        
         return jsonify(messages)
+
     except Exception as e:
+        # !!! MAGICAL FIX !!!
+        # If the DB says "timestamp does not exist", we fix it automatically.
+        if "does not exist" in str(e) and "timestamp" in str(e):
+            nuclear_fix_db()
+            # Return empty list for now (user just needs to refresh or send msg)
+            return jsonify([])
+        
         return jsonify({"error": str(e)}), 500
 
-# 4. SEND MESSAGE (Smart & Clean)
+# --- SEND MESSAGE ENDPOINT ---
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -77,7 +79,7 @@ def send_chat():
     sender_name = data.get('sender_name')
     message_text = data.get('message', '')
 
-    # SAVE HUMAN MESSAGE (Ignore System Commands)
+    # 1. Save Human Message (Skip System Commands)
     if sender_name not in ["SYSTEM_COMMAND", "SYSTEM_WELCOME"]:
         try:
             conn = get_db_connection()
@@ -90,9 +92,11 @@ def send_chat():
             cur.close()
             conn.close()
         except Exception as e:
+            # If save fails due to DB error, try to fix and ignore for this one turn
+            if "does not exist" in str(e): nuclear_fix_db()
             return jsonify({"error": str(e)}), 500
 
-    # AI LOGIC
+    # 2. AI Logic
     should_reply = False
     ai_prompt = ""
 
@@ -105,15 +109,13 @@ def send_chat():
         ai_prompt = message_text
 
     else:
-        # Check for Triggers
+        # Check Triggers
         triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
         is_command = "execute option" in message_text.lower()
-        is_addressed = any(t in message_text.lower() for t in triggers) or is_command
-        
-        if is_addressed:
+        if any(t in message_text.lower() for t in triggers) or is_command:
             should_reply = True
+            # Fetch Context (Safe Fetch)
             try:
-                # Fetch context
                 conn = get_db_connection()
                 cur = conn.cursor(cursor_factory=RealDictCursor)
                 cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC LIMIT 15", (room_id,))
@@ -124,15 +126,12 @@ def send_chat():
             except:
                 context_str = ""
 
-            ai_prompt = f"""
-            Context: {context_str}
-            User: {message_text}
-            You are a Strategy Consultant. If the user says "EXECUTE OPTION", perform the analysis. Otherwise, answer the question.
-            """
+            ai_prompt = f"Context: {context_str}\nUser: {message_text}\nAnswer strategically. If EXECUTE OPTION found, perform analysis."
 
     if not should_reply:
         return jsonify({"status": "Stored"})
 
+    # 3. Call Gemini
     try:
         model = genai.GenerativeModel('gemini-pro')
         response = model.generate_content(ai_prompt)
@@ -152,7 +151,6 @@ def send_chat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 5. CLEAR ROOM
 @app.route('/api/chat/clear', methods=['POST'])
 def clear_room():
     data = request.json
