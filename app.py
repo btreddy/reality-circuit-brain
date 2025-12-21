@@ -8,15 +8,13 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURATION ---
 def get_db_connection():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
 
-# --- AUTO-REPAIR FUNCTION ---
+# --- AUTO-REPAIR (Keep this, it protects you) ---
 def nuclear_fix_db():
-    """Drops the old broken table and creates the new one with timestamp."""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -39,14 +37,12 @@ def nuclear_fix_db():
     except Exception as e:
         print(f"❌ REPAIR FAILED: {e}")
 
-# --- HISTORY ENDPOINT (WITH AUTO-HEALING) ---
 @app.route('/api/chat/history', methods=['GET'])
 def get_chat_history():
     room_id = request.args.get('room_id')
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Try to select using the NEW schema (with timestamp)
         cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
         rows = cur.fetchall()
         cur.close()
@@ -58,20 +54,14 @@ def get_chat_history():
             "is_ai": row['is_ai'], 
             "timestamp": row['timestamp']
         } for row in rows]
-        
         return jsonify(messages)
 
     except Exception as e:
-        # !!! MAGICAL FIX !!!
-        # If the DB says "timestamp does not exist", we fix it automatically.
-        if "does not exist" in str(e) and "timestamp" in str(e):
+        if "does not exist" in str(e):
             nuclear_fix_db()
-            # Return empty list for now (user just needs to refresh or send msg)
             return jsonify([])
-        
         return jsonify({"error": str(e)}), 500
 
-# --- SEND MESSAGE ENDPOINT ---
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -79,7 +69,7 @@ def send_chat():
     sender_name = data.get('sender_name')
     message_text = data.get('message', '')
 
-    # 1. Save Human Message (Skip System Commands)
+    # 1. SAVE HUMAN MESSAGE
     if sender_name not in ["SYSTEM_COMMAND", "SYSTEM_WELCOME"]:
         try:
             conn = get_db_connection()
@@ -92,11 +82,10 @@ def send_chat():
             cur.close()
             conn.close()
         except Exception as e:
-            # If save fails due to DB error, try to fix and ignore for this one turn
             if "does not exist" in str(e): nuclear_fix_db()
             return jsonify({"error": str(e)}), 500
 
-    # 2. AI Logic
+    # 2. DECIDE IF AI SHOULD REPLY
     should_reply = False
     ai_prompt = ""
 
@@ -109,13 +98,12 @@ def send_chat():
         ai_prompt = message_text
 
     else:
-        # Check Triggers
         triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
         is_command = "execute option" in message_text.lower()
         if any(t in message_text.lower() for t in triggers) or is_command:
             should_reply = True
-            # Fetch Context (Safe Fetch)
             try:
+                # Fetch Context
                 conn = get_db_connection()
                 cur = conn.cursor(cursor_factory=RealDictCursor)
                 cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC LIMIT 15", (room_id,))
@@ -125,18 +113,32 @@ def send_chat():
                 context_str = "\n".join([f"{r['sender_name']}: {r['message']}" for r in rows])
             except:
                 context_str = ""
-
-            ai_prompt = f"Context: {context_str}\nUser: {message_text}\nAnswer strategically. If EXECUTE OPTION found, perform analysis."
+            ai_prompt = f"Context: {context_str}\nUser: {message_text}\nAnswer strategically."
 
     if not should_reply:
         return jsonify({"status": "Stored"})
 
-    # 3. Call Gemini
+    # 3. CALL GEMINI (WITH SAFETY NET)
     try:
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(ai_prompt)
+        # Try the newer model first, it is more stable
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(ai_prompt)
+        except:
+            # Fallback to pro if flash fails
+            model = genai.GenerativeModel('gemini-pro')
+            response = model.generate_content(ai_prompt)
+            
         ai_reply = response.text
         
+    except Exception as e:
+        # !!! HERE IS THE FIX !!!
+        # Instead of crashing (500), we capture the error and send it to the chat.
+        print(f"AI ERROR: {e}")
+        ai_reply = f"⚠️ SYSTEM ERROR: {str(e)}"
+
+    # 4. SAVE AI REPLY (Even if it's an error message)
+    try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
@@ -147,7 +149,6 @@ def send_chat():
         cur.close()
         conn.close()
         return jsonify({"ai_reply": ai_reply})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
