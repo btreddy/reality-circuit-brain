@@ -17,14 +17,20 @@ function ChatInterface({ senderName, roomId }) {
   const chatWindowRef = useRef(null); 
   const fileInputRef = useRef(null); 
 
-  // --- 1. WELCOME TRIGGER (UPDATED) ---
+  /// --- 1. WELCOME TRIGGER (FIXED: Waits for Name) ---
   useEffect(() => {
+    // CRITICAL FIX: If we don't have the name yet, do nothing. Wait.
+    if (!senderName || !roomId) return;
+
     const triggerWelcome = async () => {
-      // Check if we already welcomed this user in this session to prevent duplicates
-      const hasWelcomed = sessionStorage.getItem(`welcomed_${roomId}_${senderName}`);
-      if (hasWelcomed) return;
+      // Check session storage so we don't welcome twice
+      const sessionKey = `welcomed_${roomId}_${senderName}`;
+      if (sessionStorage.getItem(sessionKey)) return;
 
       try {
+        // Mark as done immediately
+        sessionStorage.setItem(sessionKey, 'true');
+
         const res = await fetch(`${API_URL}/api/chat/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -37,7 +43,6 @@ function ChatInterface({ senderName, roomId }) {
 
         const data = await res.json();
         
-        // IMMEDIATE UPDATE: Show the welcome message right now!
         if (data.ai_reply) {
             setMessages(prev => [...prev, {
                 sender: "AI Consultant",
@@ -45,20 +50,15 @@ function ChatInterface({ senderName, roomId }) {
                 is_ai: true,
                 timestamp: new Date().toISOString()
             }]);
-            // Mark as done so it doesn't happen again on refresh
-            sessionStorage.setItem(`welcomed_${roomId}_${senderName}`, 'true');
         }
       } catch (err) {
         console.error("Welcome trigger failed", err);
       }
     };
 
-    if (senderName) {
-        triggerWelcome();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+    triggerWelcome();
+    // The fix is here: we add [senderName] so it runs again once the name loads
+  }, [senderName, roomId]);
   // --- 2. FETCH HISTORY (Runs on Interval) ---
   useEffect(() => {
     fetchHistory();
@@ -256,7 +256,7 @@ function ChatInterface({ senderName, roomId }) {
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%'}}>
             <div>
                 <h3 style={{margin:0}}>WAR ROOM: {roomId.toUpperCase()}</h3>
-                <span className="live-indicator">● ONLINE | AGENT: {senderName}</span>
+                <span className="live-indicator">● ONLINE | WARRIOR: {senderName}</span>
             </div>
             <div>
               <button onClick={askAiForHelp} style={{
