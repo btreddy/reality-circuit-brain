@@ -72,6 +72,43 @@ function ChatInterface({ senderName, roomId }) {
       alert("No messages to export!");
       return;
     }
+    // --- NEW: ASK AI FOR CONTEXTUAL SUGGESTIONS ---
+  const askAiForHelp = async () => {
+    // 1. Force the scroll to bottom
+    setShouldAutoScroll(true);
+    setLoading(true);
+
+    // 2. Define the "Meta-Prompt"
+    // We don't save this to 'messages' because we don't need to see the user asking for it.
+    // We just want to see the AI's reply.
+    const prompt = "Analyze the conversation history above. Suggest 3 distinct, high-value ways you can organize, synthesize, or analyze this information right now (e.g., SWOT, Cost Table, Action Plan, Risk Assessment, etc.). List them clearly as Option 1, 2, and 3. Keep it brief.";
+
+    try {
+      const res = await fetch(`${API_URL}/api/chat/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_id: roomId,
+          sender_name: "SYSTEM_COMMAND", // Special name so we know it's a system request
+          message: prompt
+        })
+      });
+
+      const data = await res.json();
+      if (data.ai_reply) {
+        setMessages(prev => Array.isArray(prev) ? [...prev, {
+          sender: "AI Consultant",
+          text: data.ai_reply,
+          is_ai: true,
+          timestamp: new Date().toISOString()
+        }] : []);
+      }
+    } catch (err) {
+      console.error("Error asking AI:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     // 1. Setup Headers
     const headers = ["Timestamp", "Sender", "Message Type", "Content"];
@@ -212,6 +249,16 @@ function ChatInterface({ senderName, roomId }) {
                 background: '#330000', border: '1px solid red', color: 'red', 
                 padding: '5px 10px', cursor: 'pointer', fontSize: '0.7rem'
             }}>
+              {/* AI ASSIST BUTTON */}
+            <button onClick={askAiForHelp} style={{
+                background: '#4B0082', border: '1px solid #9370DB', color: '#E6E6FA', 
+                padding: '5px 10px', cursor: 'pointer', fontSize: '0.7rem', marginRight: '10px'
+            }}>
+                ✨ AI ASSIST
+            </button>
+            
+            {/* Existing Save Report Button */}
+            <button onClick={exportChat} ... >
                 ⚠ WIPE MEMORY
             </button>
         </div>
