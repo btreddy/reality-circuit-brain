@@ -177,6 +177,24 @@ def clear_history():
     cur.close()
     conn.close()
     return jsonify({"status": "CLEARED"})
+# --- NUCLEAR RESET SWITCH (Run once to fix DB) ---
+@app.route('/api/nuke_database', methods=['GET'])
+def nuke_database():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # 1. Destroy old tables
+        cur.execute("DROP TABLE IF EXISTS users CASCADE;")
+        cur.execute("DROP TABLE IF EXISTS room_chats CASCADE;")
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # 2. Rebuild fresh tables
+        init_db()
+        return "⚠️ SYSTEM ALERT: DATABASE WIPED AND REBUILT. YOU MAY NOW SIGN UP."
+    except Exception as e:
+        return f"RESET FAILED: {str(e)}"
 
 if __name__ == '__main__':
     # Initialize DB locally if running directly
