@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ChatInterface from './ChatInterface';
-import './App.css';
+import './Main.css';
 
 // 🔗 CONNECT TO YOUR LIVE BRAIN
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
