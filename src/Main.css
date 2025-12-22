@@ -399,3 +399,77 @@ textarea:focus, select:focus {
   color: #00f3ff;
   box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
 }
+/* --- AUTH SCREENS --- */
+.auth-box {
+  background: rgba(0, 20, 0, 0.9);
+  border: 2px solid #00ff41;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+.auth-box input {
+  width: 100%;
+  padding: 15px;
+  margin: 10px 0;
+  background: #000;
+  border: 1px solid #333;
+  color: #00ff41;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+}
+
+.cyber-btn {
+  width: 100%;
+  padding: 15px;
+  margin-top: 20px;
+  background: #003300;
+  border: 1px solid #00ff41;
+  color: #00ff41;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.cyber-btn:hover {
+  background: #00ff41;
+  color: #000;
+  box-shadow: 0 0 15px #00ff41;
+}
+
+.stats-panel {
+  border: 1px dashed #555;
+  padding: 15px;
+  margin: 20px 0;
+  color: #aaa;
+}
+
+.highlight { color: #fff; font-weight: bold; }
+.green { color: #00ff41; }
+.orange { color: #ffae00; }
+
+.locked-mode .auth-box {
+  border-color: #ff0000;
+  box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+}
+
+.red-text { color: #ff0000; text-shadow: 0 0 5px red; }
+.subscribe-btn {
+  background: #330000;
+  border-color: #ff0000;
+  color: #ff0000;
+}
+.subscribe-btn:hover {
+  background: #ff0000;
+  color: #000;
+}
+
+.link-text {
+  margin-top: 20px;
+  font-size: 0.8rem;
+  color: #666;
+  cursor: pointer;
+}
+.link-text:hover { color: #00ff41; text-decoration: underline; }
