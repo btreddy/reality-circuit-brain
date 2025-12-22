@@ -473,3 +473,21 @@ textarea:focus, select:focus {
   cursor: pointer;
 }
 .link-text:hover { color: #00ff41; text-decoration: underline; }
+/* EXIT BUTTON STYLE */
+.exit-btn {
+  background: #330000;
+  border: 1px solid #ff0000;
+  color: #ff0000;
+  padding: 5px 15px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: 0.3s;
+}
+
+.exit-btn:hover {
+  background: #ff0000;
+  color: #000;
+  box-shadow: 0 0 10px #ff0000;
+}
