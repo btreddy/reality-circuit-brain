@@ -4,7 +4,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 import google.generativeai as genai
-import time
 
 app = Flask(__name__)
 CORS(app)
@@ -33,13 +32,11 @@ def generate_smart_content(prompt):
             print(f"🧠 Trying Brain: {model_name}...")
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
-            return response.text # Success! Return the answer.
+            return response.text 
         except Exception as e:
             print(f"⚠️ {model_name} Failed: {e}")
-            # If it's a quota error (429) or not found (404), we continue to the next model.
             continue
     
-    # If ALL models fail, then we return the error
     raise Exception("All AI Brains are currently busy or offline. Please try again in 1 minute.")
 
 # 2. AUTO-REPAIR (DB Health)
@@ -92,7 +89,7 @@ def get_chat_history():
             return jsonify([])
         return jsonify({"error": str(e)}), 500
 
-# 4. SEND MESSAGE ENDPOINT
+# 4. SEND MESSAGE ENDPOINT (UPDATED WITH SOLO MODE)
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -116,7 +113,7 @@ def send_chat():
             if "does not exist" in str(e): nuclear_fix_db()
             return jsonify({"error": str(e)}), 500
 
-    # DECIDE IF AI SHOULD REPLY
+    # --- DECISION LOGIC ---
     should_reply = False
     ai_prompt = ""
 
@@ -129,9 +126,35 @@ def send_chat():
         ai_prompt = message_text
 
     else:
+        # 1. CHECK HOW MANY HUMANS ARE IN THE ROOM
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            # Count distinct senders (excluding AI and System messages)
+            cur.execute("""
+                SELECT COUNT(DISTINCT sender_name) 
+                FROM room_chats 
+                WHERE room_id = %s 
+                AND is_ai = FALSE 
+                AND sender_name NOT LIKE 'SYSTEM_%'
+            """, (room_id,))
+            human_count = cur.fetchone()[0]
+            cur.close()
+            conn.close()
+        except:
+            human_count = 1 # Assume solo if check fails
+
+        # 2. DEFINE TRIGGERS
         triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
         is_command = "execute option" in message_text.lower()
-        if any(t in message_text.lower() for t in triggers) or is_command:
+        is_addressed = any(t in message_text.lower() for t in triggers)
+        
+        # 3. SOLO MODE RULE: If only 1 human (you), AI replies to EVERYTHING.
+        #    GROUP MODE RULE: If >1 humans, AI waits to be called.
+        if human_count <= 1:
+            is_addressed = True 
+
+        if is_addressed or is_command:
             should_reply = True
             try:
                 # Fetch Context
@@ -151,9 +174,7 @@ def send_chat():
 
     # CALL THE UNSTOPPABLE BRAIN
     try:
-        # Use our new smarter function that tries multiple models
         ai_reply = generate_smart_content(ai_prompt)
-        
     except Exception as e:
         print(f"ALL AI FAILED: {e}")
         ai_reply = f"⚠️ SYSTEM ERROR: All AI circuits busy. {str(e)}"
