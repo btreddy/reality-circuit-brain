@@ -61,6 +61,31 @@ def nuclear_fix_db():
         print("✅ DATABASE REPAIRED SUCCESSFULLY.")
     except Exception as e:
         print(f"❌ REPAIR FAILED: {e}")
+        # --- NEW: USER DATABASE SETUP ---
+@app.route('/api/setup_users', methods=['GET'])
+def setup_user_table():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Create Users Table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                sessions_used INTEGER DEFAULT 0,
+                is_subscribed BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return "<h1>✅ USER TABLE CREATED!</h1> <p>The foundation for the Locking System is ready.</p>"
+    except Exception as e:
+        return f"<h1>❌ ERROR:</h1> <p>{str(e)}</p>"
 
 # 3. HISTORY ENDPOINT
 @app.route('/api/chat/history', methods=['GET'])
