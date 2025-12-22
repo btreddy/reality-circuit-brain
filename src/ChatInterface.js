@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import './Main.css'; // Ensuring we use the correct CSS file
+import './Main.css';
 
-// 🔗 CONNECT TO YOUR LIVE BRAIN
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 
 function ChatInterface({ roomId, username, onLeave }) {
@@ -10,25 +9,22 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Ref to track if we should scroll
   const messagesEndRef = useRef(null);
-  // Ref to store the previous message count to compare
   const prevMessageCount = useRef(0);
 
-  // 1. SMART SCROLL (Only scrolls if new messages arrive)
+  // 1. SMART SCROLL
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    // Only scroll if we have MORE messages than before
     if (messages.length > prevMessageCount.current) {
       scrollToBottom();
       prevMessageCount.current = messages.length;
     }
   }, [messages]);
 
-  // 2. LOAD HISTORY (With Anti-Jump Logic)
+  // 2. LOAD HISTORY
   useEffect(() => {
     fetchHistory();
     const interval = setInterval(fetchHistory, 5000);
@@ -39,7 +35,6 @@ function ChatInterface({ roomId, username, onLeave }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
-      
       if (Array.isArray(data)) {
         const formatted = data.map(msg => ({
           id: msg.timestamp,
@@ -47,17 +42,14 @@ function ChatInterface({ roomId, username, onLeave }) {
           sender: msg.sender,
           isUser: !msg.is_ai
         }));
-
-        // STOP THE JUMP: Only update state if the number of messages changed
+        
         setMessages(prev => {
-            if (prev.length === formatted.length) {
-                return prev; // Do nothing (No re-render, no jump)
-            }
-            return formatted; // New message found! Update and let effect scroll.
+            if (prev.length === formatted.length) return prev;
+            return formatted;
         });
       }
     } catch (err) {
-      console.error("History Load Failed:", err);
+      console.error("History Error:", err);
     }
   };
 
@@ -66,9 +58,8 @@ function ChatInterface({ roomId, username, onLeave }) {
     const textToSend = textOverride || inputText;
     if (!textToSend.trim()) return;
 
-    // Optimistic Update
     const tempMsg = { id: Date.now(), text: textToSend, sender: username, isUser: true };
-    setMessages(prev => [...prev, tempMsg]); // This triggers scroll immediately
+    setMessages(prev => [...prev, tempMsg]);
     setInputText('');
     setIsLoading(true);
 
@@ -88,6 +79,34 @@ function ChatInterface({ roomId, username, onLeave }) {
     setIsLoading(false);
   };
 
+  // 4. NEW: WIPE DATA (Clear Chat)
+  const handleWipe = async () => {
+    if (!window.confirm("☢️ WARNING: This will permanently delete all room data. Proceed?")) return;
+    
+    try {
+      await fetch(`${API_BASE_URL}/api/chat/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId }),
+      });
+      setMessages([]); // Clear locally immediately
+      prevMessageCount.current = 0;
+    } catch (err) {
+      alert("Wipe Failed");
+    }
+  };
+
+  // 5. NEW: SAVE INTEL (Download Text)
+  const handleSave = () => {
+    const content = messages.map(m => `[${m.sender}]: ${m.text}`).join('\n\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `WAR_ROOM_REPORT_${roomId}.txt`;
+    a.click();
+  };
+
   return (
     <div className="chat-container">
       {/* --- HEADER --- */}
@@ -99,11 +118,13 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
         
         <div className="header-actions">
-           <button onClick={onLeave} className="exit-btn">🛑 EXIT MISSION</button>
+           <button onClick={handleSave} className="tool-btn">💾 SAVE</button>
+           <button onClick={handleWipe} className="tool-btn">☢️ WIPE</button>
+           <button onClick={onLeave} className="exit-btn">🛑 EXIT</button>
         </div>
       </div>
 
-      {/* --- MESSAGES AREA --- */}
+      {/* --- MESSAGES --- */}
       <div className="messages-area">
         {messages.map((msg, index) => (
           <div key={index} className={`message-row ${msg.isUser ? 'user-row' : 'ai-row'}`}>
@@ -117,7 +138,7 @@ function ChatInterface({ roomId, username, onLeave }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* --- INPUT AREA --- */}
+      {/* --- INPUT --- */}
       <div className="input-area">
         <div className="quick-actions">
            <button onClick={() => handleSend("Analyze SWOT for this deal")}>⚡ SWOT</button>

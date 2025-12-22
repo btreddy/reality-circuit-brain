@@ -628,3 +628,27 @@ textarea:focus, select:focus {
   background: #fff;
   box-shadow: 0 0 15px #fff;
 }
+/* TOOL BUTTONS (Save & Wipe) */
+.tool-btn {
+  background: #002200;
+  border: 1px solid #005500;
+  color: #00ff41;
+  padding: 5px 15px;
+  margin-right: 5px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  transition: 0.3s;
+}
+
+.tool-btn:hover {
+  background: #00ff41;
+  color: #000;
+  box-shadow: 0 0 10px #00ff41;
+}
+
+/* Make header actions align nicely */
+.header-actions {
+  display: flex;
+  align-items: center;
+}
