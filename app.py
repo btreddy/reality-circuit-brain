@@ -165,34 +165,48 @@ def send_chat():
     sender_name = data.get('sender_name')
     message_text = data.get('message', '')
 
+    # 1. Store the Human Message
     if sender_name not in ["SYSTEM_COMMAND", "SYSTEM_WELCOME"]:
         try:
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", (room_id, sender_name, message_text, False))
             conn.commit()
+            cur.close()
             conn.close()
-        except: pass
+        except Exception as e:
+            if "does not exist" in str(e): nuclear_fix_db()
 
+    # 2. DECIDE: Should AI Reply?
     should_reply = False
+    ai_prompt = ""
+    
     if sender_name == "SYSTEM_WELCOME":
         should_reply = True
-        ai_prompt = f"Welcome user '{message_text}' professionally to the War Room."
+        ai_prompt = f"You are an expert Strategic Consultant. The user '{message_text}' has just entered the 'War Room'. Give them a very short, professional, high-energy welcome message."
     elif sender_name == "SYSTEM_COMMAND":
         should_reply = True
         ai_prompt = message_text
     else:
-        # Solo Logic + Triggers
+        # Check if room is "Crowded" (More than 1 human)
         try:
             conn = get_db_connection()
             cur = conn.cursor()
             cur.execute("SELECT COUNT(DISTINCT sender_name) FROM room_chats WHERE room_id = %s AND is_ai = FALSE AND sender_name NOT LIKE 'SYSTEM_%%'", (room_id,))
             human_count = cur.fetchone()[0]
+            cur.close()
             conn.close()
-        except: human_count = 1
+        except: human_count = 1 
+
+        # --- THE FIX IS HERE ---
+        # We add the Button Keywords to the Trigger List
+        triggers = ["@ai", "ai consultant", "hey ai", "swot", "risks", "roi", "calculate", "analyze", "identify"]
         
-        is_addressed = (human_count <= 1) or any(t in message_text.lower() for t in ["@ai", "consultant"]) or "execute" in message_text.lower()
+        is_addressed = any(t in message_text.lower() for t in triggers)
         
+        # Also reply if user is alone
+        if human_count <= 1: is_addressed = True 
+
         if is_addressed:
             should_reply = True
             try:
@@ -200,24 +214,36 @@ def send_chat():
                 cur = conn.cursor(cursor_factory=RealDictCursor)
                 cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC LIMIT 15", (room_id,))
                 rows = cur.fetchall()
+                context_str = "\n".join([f"{r['sender_name']}: {r['message']}" for r in rows])
+                cur.close()
                 conn.close()
-                context = "\n".join([f"{r['sender_name']}: {r['message']}" for r in rows])
-            except: context = ""
+            except: context_str = ""
             
-            ai_prompt = f"Context: {context}\nUser: {message_text}\nROLE: Real Estate Strategy Consultant (Hyderabad). Fluent in Telugu/English. Translate if asked. Answer strategically."
+            ai_prompt = f"""
+            Context: {context_str}
+            User Query: {message_text}
+            ROLE: You are an expert Real Estate Strategy Consultant for the Hyderabad/Telangana market.
+            LANGUAGE RULES:
+            1. You are FLUENT in Telugu and English.
+            2. If the user asks in Telugu, ANSWER IN TELUGU.
+            3. Keep answers concise, strategic, and actionable (Bullet points preferred).
+            TASK: Answer the user's query strategically.
+            """
 
-    if should_reply:
-        try:
-            ai_reply = generate_smart_content(ai_prompt)
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", (room_id, "AI Consultant", ai_reply, True))
-            conn.commit()
-            conn.close()
-            return jsonify({"ai_reply": ai_reply})
-        except Exception as e: return jsonify({"error": str(e)}), 500
-    
-    return jsonify({"status": "Stored"})
+    if not should_reply: return jsonify({"status": "Stored (Silent Mode)"})
+
+    # 3. Generate AI Reply
+    try:
+        ai_reply = generate_smart_content(ai_prompt)
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", (room_id, "AI Consultant", ai_reply, True))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"ai_reply": ai_reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/chat/clear', methods=['POST'])
 def clear_room():
