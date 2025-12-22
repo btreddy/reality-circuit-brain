@@ -20,7 +20,6 @@ def generate_smart_content(prompt):
     Tries multiple models in order. If one fails (quota/error), 
     it automatically switches to the next one.
     """
-    # The Hierarchy of Brains (Best to Backup)
     models_to_try = [
         'gemini-2.0-flash-exp',  # 1. Newest & Fastest
         'gemini-1.5-flash',      # 2. Reliable Standard
@@ -89,7 +88,7 @@ def get_chat_history():
             return jsonify([])
         return jsonify({"error": str(e)}), 500
 
-# 4. SEND MESSAGE ENDPOINT (UPDATED WITH SOLO MODE)
+# 4. SEND MESSAGE ENDPOINT
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -130,7 +129,7 @@ def send_chat():
         try:
             conn = get_db_connection()
             cur = conn.cursor()
-            # Count distinct senders (excluding AI and System messages)
+            # Count distinct senders
             cur.execute("""
                 SELECT COUNT(DISTINCT sender_name) 
                 FROM room_chats 
@@ -142,15 +141,14 @@ def send_chat():
             cur.close()
             conn.close()
         except:
-            human_count = 1 # Assume solo if check fails
+            human_count = 1 
 
         # 2. DEFINE TRIGGERS
         triggers = ["@ai", "ai consultant", "consultant", "hey ai"]
         is_command = "execute option" in message_text.lower()
         is_addressed = any(t in message_text.lower() for t in triggers)
         
-        # 3. SOLO MODE RULE: If only 1 human (you), AI replies to EVERYTHING.
-        #    GROUP MODE RULE: If >1 humans, AI waits to be called.
+        # 3. SOLO MODE: If 1 human, AI talks automatically.
         if human_count <= 1:
             is_addressed = True 
 
@@ -167,12 +165,26 @@ def send_chat():
                 context_str = "\n".join([f"{r['sender_name']}: {r['message']}" for r in rows])
             except:
                 context_str = ""
-            ai_prompt = f"Context: {context_str}\nUser: {message_text}\nAnswer strategically."
+            
+            # --- THE FIX: FORCED LANGUAGE INSTRUCTION ---
+            ai_prompt = f"""
+            Context: {context_str}
+            User Query: {message_text}
+            
+            ROLE: You are an expert Real Estate Strategy Consultant for the Hyderabad/Telangana market.
+            
+            LANGUAGE RULES:
+            1. You are FLUENT in Telugu and English.
+            2. If the user asks in Telugu, ANSWER IN TELUGU. Do not apologize. Do not say you cannot translate. Just do it.
+            3. If the user asks for English, answer in English.
+            
+            TASK: Answer the user's query strategically.
+            """
 
     if not should_reply:
         return jsonify({"status": "Stored"})
 
-    # CALL THE UNSTOPPABLE BRAIN
+    # CALL THE BRAIN
     try:
         ai_reply = generate_smart_content(ai_prompt)
     except Exception as e:
