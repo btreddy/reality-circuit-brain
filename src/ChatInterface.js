@@ -150,9 +150,10 @@ function ChatInterface({ roomId, username, onLeave }) {
 
       <div className="input-area">
         <div className="quick-actions">
-           <button onClick={() => handleSend("Analyze SWOT")}>⚡ SWOT</button>
-           <button onClick={() => handleSend("Identify Risks")}>⚠️ RISKS</button>
-           {/* --- NEW: FILE PREVIEW --- */}
+           <button onClick={() => handleSend("Brainstorm ideas for this")}>💡 IDEAS</button>
+           <button onClick={() => handleSend("Analyze the risks")}>⚠️ RISKS</button>
+           <button onClick={() => handleSend("Create a Strategy Plan")}>🚀 PLAN</button>
+           {/* File Preview Tag (Keep this!) */}
            {selectedFile && <span className="file-tag">📎 {selectedFile.name} <button onClick={()=>setSelectedFile(null)}>x</button></span>}
         </div>
         
