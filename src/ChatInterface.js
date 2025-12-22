@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import './ChatInterface.css'; // Make sure you have your styles
+import './Main.css'; // Make sure you have your styles
 
 // 🔗 CONNECT TO YOUR LIVE BRAIN
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
