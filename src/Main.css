@@ -491,3 +491,140 @@ textarea:focus, select:focus {
   color: #000;
   box-shadow: 0 0 10px #ff0000;
 }
+/* --- CHAT INTERFACE RESTORATION --- */
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 90vh; /* Keeps it inside the window */
+  background: #000;
+  border: 1px solid #003300;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.1);
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #001100;
+  border-bottom: 1px solid #00ff41;
+}
+
+.header-info h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #fff;
+  text-shadow: 0 0 5px #fff;
+}
+
+.messages-area {
+  flex: 1;
+  overflow-y: auto; /* Allows scrolling */
+  padding: 20px;
+  background-image: 
+    linear-gradient(rgba(0, 20, 0, 0.9), rgba(0, 20, 0, 0.9)),
+    linear-gradient(0deg, transparent 24%, rgba(0, 255, 65, .05) 25%, rgba(0, 255, 65, .05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 65, .05) 75%, rgba(0, 255, 65, .05) 76%, transparent 77%, transparent),
+    linear-gradient(90deg, transparent 24%, rgba(0, 255, 65, .05) 25%, rgba(0, 255, 65, .05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 65, .05) 75%, rgba(0, 255, 65, .05) 76%, transparent 77%, transparent);
+  background-size: 50px 50px;
+}
+
+/* Bubbles */
+.message-row {
+  display: flex;
+  margin-bottom: 15px;
+}
+.user-row { justify-content: flex-end; }
+.ai-row { justify-content: flex-start; }
+
+.message-bubble {
+  max-width: 70%;
+  padding: 12px 18px;
+  border-radius: 5px;
+  font-family: 'Courier New', monospace;
+  line-height: 1.4;
+  position: relative;
+}
+
+.user-bubble {
+  background: #002200;
+  border: 1px solid #00ff41;
+  color: #00ff41;
+  box-shadow: 0 0 5px #00ff41;
+}
+
+.ai-bubble {
+  background: #111;
+  border-left: 3px solid #ff00ff; /* Purple accent for AI */
+  color: #e0e0e0;
+}
+
+.message-sender {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+/* --- INPUT AREA (The part that looks broken in your screenshot) --- */
+.input-area {
+  padding: 20px;
+  background: #001100;
+  border-top: 1px solid #00ff41;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.quick-actions button {
+  background: #002200;
+  border: 1px solid #005500;
+  color: #ccc;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: 0.2s;
+}
+
+.quick-actions button:hover {
+  border-color: #00ff41;
+  color: #00ff41;
+}
+
+.input-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.input-wrapper input {
+  flex: 1;
+  background: #000;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 15px;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+}
+
+.input-wrapper input:focus {
+  outline: none;
+  border-color: #00ff41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+.send-btn {
+  background: #00ff41;
+  color: #000;
+  border: none;
+  font-weight: bold;
+  padding: 0 25px;
+  cursor: pointer;
+}
+
+.send-btn:hover {
+  background: #fff;
+  box-shadow: 0 0 15px #fff;
+}
