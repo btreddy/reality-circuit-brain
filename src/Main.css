@@ -1,14 +1,14 @@
-/* --- MAIN MATRIX THEME --- */
+/* --- GLOBAL MATRIX THEME --- */
 body {
   margin: 0;
   background-color: #000;
   color: #00ff41;
   font-family: 'Courier New', Courier, monospace;
-  overflow-x: hidden; /* Prevents side scrolling */
+  overflow-x: hidden;
   width: 100%;
 }
 
-/* --- LANDING PAGE --- */
+/* --- 1. LANDING PAGE STYLES --- */
 .landing-container {
   min-height: 100vh;
   background: radial-gradient(circle at center, #001100 0%, #000 100%);
@@ -16,7 +16,6 @@ body {
   text-align: center;
   display: flex;
   flex-direction: column;
-  width: 100%;
 }
 
 .landing-hero {
@@ -58,13 +57,8 @@ body {
   border: 1px solid #00ff41;
   cursor: pointer;
 }
+.hero-btn:hover { background: #00ff41; color: #000; }
 
-.hero-btn:hover {
-  background: #00ff41;
-  color: #000;
-}
-
-/* --- SERVICES GRID --- */
 .services-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -80,20 +74,12 @@ body {
   background: rgba(0, 20, 0, 0.6);
   transition: 0.3s;
 }
-
 .service-card:hover {
   border-color: #00ff41;
   transform: translateY(-5px);
   box-shadow: 0 0 20px rgba(0, 255, 65, 0.1);
 }
 
-.service-card h3 {
-  border-bottom: 1px dashed #005500;
-  padding-bottom: 10px;
-  margin-bottom: 15px;
-}
-
-/* --- CONTACT FORM --- */
 .contact-section {
   padding: 60px 20px;
   background: #000500;
@@ -107,7 +93,6 @@ body {
   flex-direction: column;
   gap: 15px;
 }
-
 .contact-form input, .contact-form textarea {
   background: #000;
   border: 1px solid #004400;
@@ -115,15 +100,9 @@ body {
   padding: 15px;
   font-family: 'Courier New', monospace;
 }
-
-.contact-form input:focus, .contact-form textarea:focus {
-  border-color: #00ff41;
-  outline: none;
-}
-
+.contact-form input:focus, .contact-form textarea:focus { border-color: #00ff41; outline: none; }
 .status-msg { margin-top: 10px; font-weight: bold; }
 
-/* --- FOOTER --- */
 .landing-footer {
   margin-top: auto;
   padding: 40px;
@@ -132,113 +111,113 @@ body {
   font-size: 0.8rem;
 }
 
-.contact-info {
-  color: #00ff41;
-  font-size: 1rem;
-  margin-top: 10px;
-}
-
-/* --- COMMAND STACK (THE ICONS FIX) --- */
-.command-stack {
-  position: fixed;
-  bottom: 25px;
-  right: 25px;
-  z-index: 2000;
+/* --- 2. WAR ROOM (CHAT INTERFACE) STYLES --- */
+.chat-container {
   display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  gap: 15px;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-left: 1px solid #003300;
+  border-right: 1px solid #003300;
 }
 
-.stack-main-btn {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
+.chat-header {
+  padding: 20px;
+  border-bottom: 1px solid #00ff41;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #001100;
+}
+
+.chat-header h1 { margin: 0; font-size: 1.5rem; text-shadow: 0 0 5px #00ff41; }
+.online-status { font-size: 0.8rem; color: #00aa22; }
+
+.header-controls { display: flex; gap: 10px; }
+.control-btn {
   background: #000;
-  border: 2px solid #00ff41;
-  color: #00ff41;
-  font-size: 1.8rem;
+  border: 1px solid #005500;
+  color: #00aa22;
+  padding: 5px 10px;
   cursor: pointer;
-  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  font-size: 1.2rem;
 }
+.control-btn:hover { border-color: #00ff41; color: #00ff41; }
 
-.stack-main-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 0 25px rgba(0, 255, 65, 0.6);
-}
+.danger-btn { border-color: #550000; color: #aa0000; }
+.danger-btn:hover { background: #aa0000; color: #fff; }
 
-.stack-main-btn.active {
-  background: #00ff41;
-  color: #000;
-  transform: rotate(90deg);
-}
-
-.stack-options {
+.chat-window {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 15px;
-  opacity: 0;
-  transform: translateY(20px);
-  pointer-events: none;
-  transition: all 0.3s ease;
+  background: rgba(0, 20, 0, 0.3);
 }
 
-.stack-options.visible {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: all;
-}
-
-.stack-btn {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: #000;
+.message-box {
+  max-width: 70%;
+  padding: 15px;
   border: 1px solid #00ff41;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.4rem;
-  text-decoration: none;
+  background: rgba(0, 0, 0, 0.8);
   position: relative;
-  transition: 0.2s;
 }
+.message-box.user { align-self: flex-end; border-color: #00aa22; }
+.message-box.ai { align-self: flex-start; border-color: #00ff41; box-shadow: 0 0 10px rgba(0, 255, 65, 0.1); }
+.sender-label { font-size: 0.7rem; color: #005500; margin-bottom: 5px; display: block; }
 
-.stack-btn:hover {
-  background: #002200;
-  transform: scale(1.1);
-}
-
-.wa-btn { color: #25D366; border-color: #25D366; }
-.call-btn { color: #00ff41; }
-
-.tooltip {
-  position: absolute;
-  right: 60px;
+.input-area {
+  padding: 20px;
+  border-top: 1px solid #00ff41;
   background: #000;
+}
+
+.quick-actions { display: flex; gap: 10px; margin-bottom: 10px; }
+.action-btn {
+  background: #001100;
+  border: 1px solid #005500;
   color: #00ff41;
-  padding: 5px 10px;
-  border: 1px solid #00ff41;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  white-space: nowrap;
-  opacity: 0;
-  transition: 0.2s;
-  pointer-events: none;
+  padding: 5px 15px;
+  cursor: pointer;
+  font-family: 'Courier New';
+}
+.action-btn:hover { background: #00ff41; color: #000; }
+
+.input-wrapper { display: flex; gap: 10px; }
+.chat-input {
+  flex: 1;
+  background: #000;
+  border: 1px solid #005500;
+  color: #00ff41;
+  padding: 15px;
+  font-family: 'Courier New';
+  font-size: 1rem;
+}
+.chat-input:focus { border-color: #00ff41; outline: none; }
+.send-btn {
+  background: #00ff41;
+  color: #000;
+  border: none;
+  padding: 0 30px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.send-btn:hover { background: #fff; box-shadow: 0 0 15px #00ff41; }
+.attach-btn {
+  background: #000;
+  border: 1px solid #005500;
+  color: #00ff41;
+  width: 50px;
+  cursor: pointer;
+  font-size: 1.5rem;
 }
 
-.stack-btn:hover .tooltip {
-  opacity: 1;
-  right: 70px;
-}
-
-/* --- CHAT INTERFACE & LOGIN (Legacy Styles) --- */
-.chat-container, .login-container { width: 100%; max-width: 1000px; margin: 0 auto; padding: 20px; }
-.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+/* --- 3. LOGIN PAGE STYLES --- */
+.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; width: 100%; }
 .login-box { border: 1px solid #00ff41; padding: 40px; background: #000; text-align: center; width: 100%; max-width: 400px; }
 .input-group { margin: 20px 0; text-align: left; }
 .input-group label { display: block; font-size: 0.8rem; color: #00aa22; margin-bottom: 5px; }
@@ -249,8 +228,53 @@ body {
 .toggle-link:hover { color: #00ff41; }
 .error-msg { color: #ffaa00; border: 1px dashed #ffaa00; padding: 10px; margin-bottom: 20px; font-size: 0.9rem; }
 
+/* --- 4. COMMAND STACK (THE ICONS) --- */
+.command-stack {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 15px;
+}
+.stack-main-btn {
+  width: 60px; height: 60px; border-radius: 50%;
+  background: #000; border: 2px solid #00ff41;
+  color: #00ff41; font-size: 1.8rem;
+  cursor: pointer; box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+  display: flex; justify-content: center; align-items: center;
+  transition: all 0.3s;
+}
+.stack-main-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); }
+.stack-main-btn.active { background: #00ff41; color: #000; transform: rotate(90deg); }
+
+.stack-options {
+  display: flex; flex-direction: column; gap: 15px;
+  opacity: 0; transform: translateY(20px);
+  pointer-events: none; transition: all 0.3s ease;
+}
+.stack-options.visible { opacity: 1; transform: translateY(0); pointer-events: all; }
+
+.stack-btn {
+  width: 50px; height: 50px; border-radius: 50%;
+  background: #000; border: 1px solid #00ff41;
+  display: flex; justify-content: center; align-items: center;
+  font-size: 1.4rem; text-decoration: none; position: relative; transition: 0.2s;
+}
+.stack-btn:hover { background: #002200; transform: scale(1.1); }
+.wa-btn { color: #25D366; border-color: #25D366; }
+.call-btn { color: #00ff41; }
+.tooltip {
+  position: absolute; right: 60px; background: #000; color: #00ff41;
+  padding: 5px 10px; border: 1px solid #00ff41; border-radius: 4px;
+  font-size: 0.8rem; white-space: nowrap; opacity: 0; pointer-events: none;
+}
+.stack-btn:hover .tooltip { opacity: 1; right: 70px; }
+
 /* Mobile Adjustments */
 @media (max-width: 768px) {
-  .floating-actions, .command-stack { right: 10px; bottom: 15px; }
-  .float-btn, .stack-btn { width: 45px; height: 45px; }
+  .command-stack { right: 10px; bottom: 15px; }
+  .stack-btn, .stack-main-btn { width: 45px; height: 45px; }
 }
