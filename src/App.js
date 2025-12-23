@@ -4,8 +4,8 @@ import LandingPage from './LandingPage';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import './Main.css';
 
-// FIX: Hardcoded Domain to guarantee connection
-// FIX: Hardcoded to the LIVE Render Backend
+// FIX: HARDCODED LINK TO THE LIVE BRAIN
+// This allows Vercel AND Render to both talk to the backend.
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; 
 
 function Login({ onLogin, onBack }) {
@@ -30,39 +30,24 @@ function Login({ onLogin, onBack }) {
     if (!deviceId) { setError("⚠️ SCANNING DEVICE... PLEASE WAIT"); return; }
     setIsLoading(true); setError('');
     
-    // FIX: Use relative path. The backend CORS fix should handle it now.
     const endpoint = isRegistering ? '/api/signup' : '/api/login';
-    
     try {
       const payload = { username: email, password };
       if (isRegistering) payload.device_id = deviceId;
 
-      const res = await fetch(endpoint, { // Use relative path
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
+      // USES THE HARDCODED URL
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
-      // DEBUG: If it's not JSON, we want to know why!
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await res.text();
-        alert("SERVER ERROR (Not JSON): " + text.substring(0, 100)); // Show first 100 chars
-        throw new Error("Server returned HTML instead of JSON");
-      }
-
       const data = await res.json();
 
-      if (res.ok) { 
-        onLogin(data.username, data.room_id); 
-      } else { 
-        setError(`⚠️ ${data.error || 'ACCESS DENIED'}`); 
-        // alert("LOGIN FAILED: " + data.error); // Optional: Uncomment to see backend error
-      }
+      if (res.ok) { onLogin(data.username, data.room_id); } 
+      else { setError(`⚠️ ${data.error || 'ACCESS DENIED'}`); }
     } catch (err) { 
-      // THE SPY: Show the exact error on your screen
-      alert("CONNECTION ERROR DETAILS: " + err.message);
-      setError("⚠️ CONNECTION FAILED"); 
+        setError("⚠️ CONNECTION FAILED"); 
+        // Optional: Alert to debug if it fails again
+        // alert(err.message);
     }
     setIsLoading(false);
   };
