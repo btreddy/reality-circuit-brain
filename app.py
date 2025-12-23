@@ -22,13 +22,15 @@ genai.configure(api_key=GEMINI_KEY)
 def get_db_connection():
     return psycopg2.connect(DB_URL)
 
-# --- 3. DATABASE AUTO-INIT ---
+# ... (Keep imports and config at the top) ...
+
+# --- DATABASE AUTO-INIT (Updated with LEADS table) ---
 def init_db():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Create USERS Table
+        # 1. Users Table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -41,7 +43,7 @@ def init_db():
             );
         """)
         
-        # Create CHATS Table
+        # 2. Chats Table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS room_chats (
                 id SERIAL PRIMARY KEY,
@@ -52,6 +54,17 @@ def init_db():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        # 3. LEADS TABLE (New!)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS leads (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
         
         conn.commit()
         cur.close()
@@ -59,6 +72,25 @@ def init_db():
         print("✅ DATABASE & TABLES READY.")
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
+
+# --- NEW CONTACT FORM ROUTE ---
+@app.route('/api/contact', methods=['POST'])
+def save_contact():
+    data = request.json
+    name = data.get('name')
+    email = data.get('email')
+    message = data.get('message')
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO leads (name, email, message) VALUES (%s, %s, %s)", (name, email, message))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "Message Received. We will contact you shortly."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # --- 4. INTELLIGENCE CORE ---
 def generate_smart_content(prompt_text, file_data=None, mime_type=None):

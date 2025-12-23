@@ -241,3 +241,60 @@ body {
   font-size: 1rem;
   margin-top: 10px;
 }
+/* --- CONTACT FORM --- */
+.contact-section {
+  padding: 60px 20px;
+  background: #000500;
+  border-top: 1px solid #003300;
+}
+.contact-form {
+  max-width: 500px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.contact-form input, .contact-form textarea {
+  background: #000;
+  border: 1px solid #004400;
+  color: #00ff41;
+  padding: 15px;
+  font-family: 'Courier New', monospace;
+}
+.contact-form input:focus, .contact-form textarea:focus {
+  border-color: #00ff41;
+  outline: none;
+}
+.status-msg { margin-top: 10px; font-weight: bold; }
+
+/* --- FLOATING BUTTONS (WhatsApp/Call) --- */
+.floating-actions {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+}
+.float-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  text-decoration: none;
+  border: 2px solid #00ff41;
+  background: #000;
+  transition: 0.3s;
+  box-shadow: 0 0 10px #000;
+}
+.call-btn { color: #00ff41; }
+.wa-btn { color: #25D366; border-color: #25D366; }
+
+.float-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px #00ff41;
+}
