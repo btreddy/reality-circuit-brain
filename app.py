@@ -1,7 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, request, jsonify, send_from_directory, make_response
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import google.generativeai as genai
 
@@ -20,8 +20,10 @@ else:
 
 # Gemini API
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
-if GEMINI_KEY: genai.configure(api_key=GEMINI_KEY)
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
 
+# --- DATABASE HELPERS ---
 def get_db_connection():
     return psycopg2.connect(DB_URL)
 
@@ -30,22 +32,60 @@ def init_db():
         conn = get_db_connection()
         cur = conn.cursor()
         # Create Tables
-        cur.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, room_id TEXT NOT NULL, device_id TEXT, message_count INTEGER DEFAULT 0);")
-        cur.execute("CREATE TABLE IF NOT EXISTS room_chats (id SERIAL PRIMARY KEY, room_id TEXT NOT NULL, sender_name TEXT NOT NULL, message TEXT NOT NULL, is_ai BOOLEAN DEFAULT FALSE, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-        cur.execute("CREATE TABLE IF NOT EXISTS leads (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, message TEXT NOT NULL, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-        conn.commit(); cur.close(); conn.close()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                room_id TEXT NOT NULL,
+                device_id TEXT,
+                message_count INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS room_chats (
+                id SERIAL PRIMARY KEY,
+                room_id TEXT NOT NULL,
+                sender_name TEXT NOT NULL,
+                message TEXT NOT NULL,
+                is_ai BOOLEAN DEFAULT FALSE,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS leads (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
         print("✅ DATABASE TABLES READY.")
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
+# --- AI GENERATION CORE ---
 def generate_smart_content(prompt_text):
     try:
+        # Try the newest model first
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        return model.generate_content(prompt_text).text.strip()
+        response = model.generate_content(prompt_text)
+        return response.text.strip()
     except:
-        return "AI Offline. (Check API Key)"
+        try:
+            # Fallback to standard model
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt_text)
+            return response.text.strip()
+        except Exception as e:
+            return "System Malfunction: AI Core Unresponsive. (Check API Key)"
 
-# --- MANUAL CORS FIX (Extra Layer of Safety) ---
+# --- MANUAL CORS FIX (Extra Safety) ---
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -113,18 +153,56 @@ def login():
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
-    # ... (simplified for brevity, your chat logic works) ...
-    return jsonify({"ai_reply": "System Online."}) # Placeholder if needed, but keep your logic
+    room_id = data.get('room_id')
+    sender_name = data.get('sender_name')
+    message = data.get('message', '')
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    # 1. Save User Message
+    cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
+                (room_id, sender_name, message, False))
+    conn.commit()
+    
+    # 2. Generate REAL AI Response
+    # We add a system prompt so it knows who it is
+    system_prompt = f"You are Reality Circuit, a strategic business AI. Keep answers concise, professional, and tactical. The user asks: {message}"
+    ai_reply = generate_smart_content(system_prompt)
+
+    # 3. Save AI Reply
+    cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
+                (room_id, "Reality Circuit", ai_reply, True))
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return jsonify({"ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
 def get_history():
-    # ... (Your history logic) ...
-    return jsonify([])
+    room_id = request.args.get('room_id')
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
+    msgs = cur.fetchall()
+    cur.close(); conn.close()
+    return jsonify(msgs)
 
 @app.route('/api/contact', methods=['POST'])
 def save_contact():
-    # ... (Your contact logic) ...
-    return jsonify({"status": "OK"})
+    data = request.json
+    name = data.get('name')
+    email = data.get('email')
+    message = data.get('message')
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("INSERT INTO leads (name, email, message) VALUES (%s, %s, %s)", (name, email, message))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify({"status": "Message Received"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # --- FRONTEND SERVING (Must be LAST) ---
 @app.route('/', defaults={'path': ''})
@@ -136,7 +214,7 @@ def serve(path):
         if os.path.exists(app.static_folder + '/index.html'):
             return send_from_directory(app.static_folder, 'index.html')
         else:
-            return "⚠️ SYSTEM LOADING...", 200
+            return "⚠️ SYSTEM LOADING... (Frontend building)", 200
 
 if __name__ == '__main__':
     with app.app_context():
