@@ -38,7 +38,7 @@ function LandingPage({ onEnter }) {
       {/* FOOTER */}
       <footer className="landing-footer">
         <p>HYDERABAD • TELANGANA • GLOBAL</p>
-        <p className="contact-info">Partner with us: btr@safelandddeal.com</p>
+        <p className="contact-info">Partner with us: btr@safelanddeal.com</p>
       </footer>
     </div>
   );
