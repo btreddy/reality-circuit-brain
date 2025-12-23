@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './Main.css';
 
 // FIX: Use relative path (empty string) so it works on any domain automatically
-const API_BASE_URL = "https://careco-pilotai.com";
+const API_BASE_URL = "";
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
