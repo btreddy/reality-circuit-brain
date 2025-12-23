@@ -286,6 +286,28 @@ def force_create_admin():
     
     except Exception as e:
         return f"❌ FAILED: {str(e)} (User likely already exists)"
+    # --- EMERGENCY DATABASE FIXER ---
+@app.route('/api/fix_db', methods=['GET'])
+def fix_database():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Explicitly create the leads table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS leads (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        return "✅ SUCCESS: 'Leads' table created. The contact form should work now."
+    except Exception as e:
+        return f"❌ FAILED: {str(e)}"
 if __name__ == '__main__':
     with app.app_context():
         init_db()

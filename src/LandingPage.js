@@ -14,7 +14,6 @@ function LandingPage({ onEnter }) {
     setStatus('TRANSMITTING...');
     
     try {
-      // FIX: Using relative path to prevent connection errors
       const res = await fetch('/api/contact', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
@@ -38,10 +37,10 @@ function LandingPage({ onEnter }) {
       {/* --- COMMAND STACK BUTTON --- */}
       <div className="command-stack">
         <div className={`stack-options ${menuOpen ? 'visible' : ''}`}>
-          <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer" className="stack-btn wa-btn">
+          <a href="https://wa.me/917013425183" target="_blank" rel="noreferrer" className="stack-btn wa-btn">
             💬 <span className="tooltip">WHATSAPP</span>
           </a>
-          <a href="tel:+919876543210" className="stack-btn call-btn">
+          <a href="tel:+917013425183" className="stack-btn call-btn">
             📞 <span className="tooltip">SECURE LINE</span>
           </a>
         </div>
@@ -82,7 +81,7 @@ function LandingPage({ onEnter }) {
 
       <footer className="landing-footer">
         <p>HYDERABAD • TELANGANA • GLOBAL</p>
-        <p className="contact-info">admin@careco-pilotai.com</p>
+        <p className="contact-info">btr@safelanddeal.com</p>
       </footer>
     </div>
   );
