@@ -4,34 +4,51 @@ import './Main.css';
 function LandingPage({ onEnter }) {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [status, setStatus] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleContact = async () => {
-    if (!formData.name || !formData.email) { setStatus('⚠️ FIELDS REQUIRED'); return; }
+    if (!formData.name || !formData.email) {
+      setStatus('⚠️ FIELDS REQUIRED');
+      return;
+    }
     setStatus('TRANSMITTING...');
     
     try {
-      // FIX: Use relative path (starts with /api) instead of full domain
+      // FIX: Using relative path to prevent connection errors
       const res = await fetch('/api/contact', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
+
       if (res.ok) {
         setStatus('✅ TRANSMISSION RECEIVED.');
         setFormData({ name: '', email: '', message: '' });
-      } else { setStatus('❌ ERROR.'); }
-    } catch (e) { setStatus('❌ CONNECTION FAILED.'); }
+      } else {
+        setStatus('❌ ERROR.');
+      }
+    } catch (e) {
+      setStatus('❌ CONNECTION FAILED.');
+    }
   };
 
   return (
     <div className="landing-container">
-      {/* FLOATING ACTION BUTTONS (WhatsApp & Call) */}
-      <div className="floating-actions">
-        <a href="tel:+917013425183" className="float-btn call-btn">📞</a> {/* CHANGE NUMBER */}
-        <a href="https://wa.me/917013007595" target="_blank" rel="noreferrer" className="float-btn wa-btn">💬</a> {/* CHANGE NUMBER */}
+      
+      {/* --- COMMAND STACK BUTTON --- */}
+      <div className="command-stack">
+        <div className={`stack-options ${menuOpen ? 'visible' : ''}`}>
+          <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer" className="stack-btn wa-btn">
+            💬 <span className="tooltip">WHATSAPP</span>
+          </a>
+          <a href="tel:+919876543210" className="stack-btn call-btn">
+            📞 <span className="tooltip">SECURE LINE</span>
+          </a>
+        </div>
+        
+        <button className={`stack-main-btn ${menuOpen ? 'active' : ''}`} onClick={() => setMenuOpen(!menuOpen)}>
+          {menuOpen ? '✖' : '📡'} 
+        </button>
       </div>
 
       <header className="landing-hero">
@@ -52,7 +69,6 @@ function LandingPage({ onEnter }) {
         <div className="service-card"><h3>🚀 RAPID DEPLOYMENT</h3><p>From concept to cloud in record time.</p></div>
       </section>
 
-      {/* NEW CONTACT FORM SECTION */}
       <section className="contact-section">
         <h2>INITIATE PARTNERSHIP</h2>
         <div className="contact-form">
@@ -66,7 +82,7 @@ function LandingPage({ onEnter }) {
 
       <footer className="landing-footer">
         <p>HYDERABAD • TELANGANA • GLOBAL</p>
-        <p className="contact-info">admin@safelanddeal.com</p>
+        <p className="contact-info">admin@careco-pilotai.com</p>
       </footer>
     </div>
   );
