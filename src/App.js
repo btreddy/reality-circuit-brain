@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './ChatInterface';
-import LandingPage from './LandingPage'; // <--- IMPORT THE NEW PAGE
+import LandingPage from './LandingPage';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import './Main.css';
 
-const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
+const API_BASE_URL = "https://careco-pilotai.com"; // Your Live Domain
 
-function Login({ onLogin, onBack }) { // Added onBack prop
+function Login({ onLogin, onBack }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,7 +72,6 @@ function Login({ onLogin, onBack }) { // Added onBack prop
           [ {isRegistering ? "RETURN TO LOGIN" : "NEW WARRIOR REGISTRATION"} ]
         </div>
         
-        {/* BACK TO HOME BUTTON */}
         <div className="toggle-link" style={{marginTop: '10px', color: '#555'}} onClick={onBack}>
           &lt;&lt; BACK TO HOME
         </div>
@@ -83,7 +82,7 @@ function Login({ onLogin, onBack }) { // Added onBack prop
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLogin, setShowLogin] = useState(false); // <--- Controls Landing vs Login
+  const [hasEntered, setHasEntered] = useState(false); // <--- NEW STATE: Tracks if they clicked "Enter"
   const [roomId, setRoomId] = useState(null);
   const [username, setUsername] = useState('');
 
@@ -104,23 +103,22 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('war_room_user');
     localStorage.removeItem('war_room_id');
-    setIsLoggedIn(false); setRoomId(null); setUsername(''); setShowLogin(false);
+    setIsLoggedIn(false); setRoomId(null); setUsername(''); setHasEntered(false);
   };
 
-  // LOGIC: 
-  // 1. If Logged In -> Show Chat
-  // 2. If Not Logged In AND 'showLogin' is true -> Show Login Screen
-  // 3. Else -> Show Landing Page
-  
+  // --- LOGIC UPDATE ---
+  // Always show Landing Page first (unless 'hasEntered' is true)
+  if (!hasEntered) {
+    return <LandingPage onEnter={() => setHasEntered(true)} />;
+  }
+
+  // If they clicked Enter AND are logged in -> Show Chat
   if (isLoggedIn) {
     return <ChatInterface roomId={roomId} username={username} onLeave={handleLogout} />;
   }
 
-  if (showLogin) {
-    return <Login onLogin={handleLogin} onBack={() => setShowLogin(false)} />;
-  }
-
-  return <LandingPage onEnter={() => setShowLogin(true)} />;
+  // If they clicked Enter but NOT logged in -> Show Login
+  return <Login onLogin={handleLogin} onBack={() => setHasEntered(false)} />;
 }
 
 export default App;
