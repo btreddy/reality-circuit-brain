@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Main.css';
 
-const API_BASE_URL = "https://careco-pilotai.com"; // Your Live Domain
+// FIX: Use relative path (empty string) so it works on any domain automatically
+const API_BASE_URL = ""; 
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
@@ -27,9 +28,10 @@ function ChatInterface({ roomId, username, onLeave }) {
   const sendMessage = async () => {
     if (!inputText.trim()) return;
     
-    // Add User Message Instantly (Optimistic UI)
+    // Optimistic UI: Add User Message Instantly
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
+    
     setLoading(true);
     const originalText = inputText;
     setInputText(''); // Clear Input
@@ -47,19 +49,17 @@ function ChatInterface({ roomId, username, onLeave }) {
       
       const data = await res.json();
       if (data.error) {
-         // Handle Limits
          setMessages(prev => [...prev, { sender_name: "SYSTEM", message: `⚠️ ${data.error}`, is_ai: true }]);
       } else {
-         // Add AI Reply
          setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
       }
     } catch (err) {
-      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST", is_ai: true }]);
+      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST. CHECK SERVER.", is_ai: true }]);
     }
     setLoading(false);
   };
 
-  // 4. Quick Actions (Ideas, Risks, Plan)
+  // 4. Quick Actions
   const handleQuickAction = (action) => {
     let prompt = "";
     if (action === "IDEAS") prompt = "Brainstorm 3 innovative ideas for this project.";
@@ -78,7 +78,6 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
         <div className="header-controls">
           <button className="control-btn" title="Save Session">💾</button>
-          <button className="control-btn" title="Nuke Session">☢️</button>
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
       </header>
