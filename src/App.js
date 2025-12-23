@@ -29,20 +29,40 @@ function Login({ onLogin, onBack }) {
     if (!deviceId) { setError("⚠️ SCANNING DEVICE... PLEASE WAIT"); return; }
     setIsLoading(true); setError('');
     
+    // FIX: Use relative path. The backend CORS fix should handle it now.
     const endpoint = isRegistering ? '/api/signup' : '/api/login';
+    
     try {
       const payload = { username: email, password };
       if (isRegistering) payload.device_id = deviceId;
 
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(endpoint, { // Use relative path
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      // DEBUG: If it's not JSON, we want to know why!
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        alert("SERVER ERROR (Not JSON): " + text.substring(0, 100)); // Show first 100 chars
+        throw new Error("Server returned HTML instead of JSON");
+      }
+
       const data = await res.json();
 
-      if (res.ok) { onLogin(data.username, data.room_id); } 
-      else { setError(`⚠️ ${data.error || 'ACCESS DENIED'}`); }
-    } catch (err) { setError("⚠️ CONNECTION FAILED"); }
+      if (res.ok) { 
+        onLogin(data.username, data.room_id); 
+      } else { 
+        setError(`⚠️ ${data.error || 'ACCESS DENIED'}`); 
+        // alert("LOGIN FAILED: " + data.error); // Optional: Uncomment to see backend error
+      }
+    } catch (err) { 
+      // THE SPY: Show the exact error on your screen
+      alert("CONNECTION ERROR DETAILS: " + err.message);
+      setError("⚠️ CONNECTION FAILED"); 
+    }
     setIsLoading(false);
   };
 
