@@ -71,6 +71,20 @@ function ChatInterface({ roomId, username, onLeave }) {
       </div>
     ));
   };
+  // FUNCTION TO DOWNLOAD CHAT HISTORY
+const handleSaveSession = () => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const chatContent = messages.map(m => 
+    `[${m.sender_name.toUpperCase()}]:\n${m.message}\n`
+  ).join('\n-------------------\n');
+
+  const blob = new Blob([chatContent], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `WAR-ROOM-LOG-${timestamp}.txt`;
+  a.click();
+};
 
   return (
     <div className="chat-container">
@@ -80,7 +94,7 @@ function ChatInterface({ roomId, username, onLeave }) {
           <span className="online-status">ONLINE | {username}</span>
         </div>
         <div className="header-controls">
-          <button className="control-btn" title="Save Session">💾</button>
+          <button className="control-btn" onClick={handleSaveSession} title="Save Session">💾</button>
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
       </header>
