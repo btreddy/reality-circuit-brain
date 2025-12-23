@@ -143,6 +143,7 @@ def login():
         return jsonify({"error": str(e)}), 500
 
 # --- THE METERED CHAT ROUTE ---
+# --- THE METERED CHAT ROUTE (WITH ADMIN BYPASS) ---
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -152,6 +153,9 @@ def send_chat():
     file_data = data.get('file_data')
     mime_type = data.get('mime_type')
 
+    # ⚠️ MASTER KEY: Add your email(s) here to get UNLIMITED ACCESS
+    ADMIN_USERS = ["admin@sld.com", "btr@sld.com", "testing@sld.com"] 
+
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -159,12 +163,12 @@ def send_chat():
     cur.execute("SELECT message_count FROM users WHERE username = %s", (sender_name,))
     user_record = cur.fetchone()
     
-    if user_record and user_record['message_count'] >= 3:
+    # LOGIC: If count >= 3 AND user is NOT an Admin -> BLOCK THEM
+    if user_record and user_record['message_count'] >= 3 and sender_name not in ADMIN_USERS:
         cur.close(); conn.close()
-        # ⚠️ RETURN ERROR 402 (Payment Required)
         return jsonify({"error": "LIMIT_REACHED"}), 402
 
-    # 2. IF OK, INCREMENT COUNT
+    # 2. INCREMENT COUNT (We still count admins, but we never block them)
     cur.execute("UPDATE users SET message_count = message_count + 1 WHERE username = %s", (sender_name,))
     conn.commit()
 
@@ -182,27 +186,6 @@ def send_chat():
     cur.close(); conn.close()
     
     return jsonify({"ai_reply": ai_reply})
-
-@app.route('/api/chat/history', methods=['GET'])
-def get_history():
-    room_id = request.args.get('room_id')
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
-    msgs = cur.fetchall()
-    cur.close(); conn.close()
-    return jsonify(msgs)
-
-@app.route('/api/chat/clear', methods=['POST'])
-def clear_history():
-    room_id = request.json.get('room_id')
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
-    conn.commit()
-    cur.close(); conn.close()
-    return jsonify({"status": "CLEARED"})
-
 # --- NUCLEAR RESET ---
 @app.route('/api/nuke_database', methods=['GET'])
 def nuke_database():
