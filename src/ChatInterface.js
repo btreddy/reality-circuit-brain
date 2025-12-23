@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Main.css';
 
-// FIX: HARDCODED URL - Matches the working Login URL
+// LIVE CONNECTION
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; 
 
 function ChatInterface({ roomId, username, onLeave }) {
@@ -10,51 +10,33 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // 1. Auto-Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  // 2. Load History on Mount
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`)
       .then(res => res.json())
       .then(data => {
-        // If the server returns an error object, handle it gracefully
-        if (Array.isArray(data)) {
-            setMessages(data);
-        } else {
-            console.error("History format error:", data);
-        }
+        if (Array.isArray(data)) setMessages(data);
       })
       .catch(err => console.error("History Error:", err));
   }, [roomId]);
 
-  // 3. Send Message Function
   const sendMessage = async () => {
     if (!inputText.trim()) return;
-    
-    // Optimistic UI
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
-    
     setLoading(true);
     const originalText = inputText;
     setInputText(''); 
 
     try {
-      // USES THE HARDCODED LINK
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          room_id: roomId,
-          sender_name: username,
-          message: originalText
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId, sender_name: username, message: originalText })
       });
-      
       const data = await res.json();
       if (data.error) {
          setMessages(prev => [...prev, { sender_name: "SYSTEM", message: `⚠️ ${data.error}`, is_ai: true }]);
@@ -62,13 +44,11 @@ function ChatInterface({ roomId, username, onLeave }) {
          setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
       }
     } catch (err) {
-      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST. CHECK SERVER.", is_ai: true }]);
-      console.error("Chat Error:", err);
+      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST.", is_ai: true }]);
     }
     setLoading(false);
   };
 
-  // 4. Quick Actions
   const handleQuickAction = (action) => {
     let prompt = "";
     if (action === "IDEAS") prompt = "Brainstorm 3 innovative ideas for this project.";
@@ -77,9 +57,23 @@ function ChatInterface({ roomId, username, onLeave }) {
     setInputText(prompt);
   };
 
+  // --- NEW: SMART FORMATTER (Parses **Bold** and Lines) ---
+  const renderFormattedText = (text) => {
+    if (!text) return "";
+    return text.split('\n').map((line, i) => (
+      <div key={i} style={{ minHeight: '1.2em', marginBottom: '4px' }}>
+        {line.split(/(\*\*.*?\*\*)/).map((part, j) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={j} style={{ color: '#fff' }}>{part.slice(2, -2)}</strong>;
+          }
+          return <span key={j}>{part}</span>;
+        })}
+      </div>
+    ));
+  };
+
   return (
     <div className="chat-container">
-      {/* --- HEADER --- */}
       <header className="chat-header">
         <div>
           <h1>WAR ROOM: {username.split('@')[0]}</h1>
@@ -91,26 +85,26 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
       </header>
 
-      {/* --- CHAT WINDOW --- */}
       <div className="chat-window">
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
             <span className="sender-label">{msg.sender_name}</span>
-            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
+            {/* USE THE NEW FORMATTER HERE */}
+            <div className="smart-text">
+              {renderFormattedText(msg.message)}
+            </div>
           </div>
         ))}
-        {loading && <div className="message-box ai">... ANALYZING DATA STREAM ...</div>}
+        {loading && <div className="message-box ai">... INTELLIGENCE PROCESSING ...</div>}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* --- INPUT AREA --- */}
       <div className="input-area">
         <div className="quick-actions">
           <button className="action-btn" onClick={() => handleQuickAction('IDEAS')}>💡 IDEAS</button>
           <button className="action-btn" onClick={() => handleQuickAction('RISKS')}>⚠️ RISKS</button>
           <button className="action-btn" onClick={() => handleQuickAction('PLAN')}>🚀 PLAN</button>
         </div>
-
         <div className="input-wrapper">
           <button className="attach-btn">📎</button>
           <input 
