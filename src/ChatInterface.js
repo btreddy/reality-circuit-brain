@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Main.css';
 
-// LIVE CONNECTION
+// FIX: Hardcoded URL to guarantee connection
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; 
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copyStatus, setCopyStatus] = useState(''); // State for copy feedback
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -18,9 +19,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`)
       .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setMessages(data);
-      })
+      .then(data => setMessages(data))
       .catch(err => console.error("History Error:", err));
   }, [roomId]);
 
@@ -34,8 +33,13 @@ function ChatInterface({ roomId, username, onLeave }) {
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_id: roomId, sender_name: username, message: originalText })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_id: roomId,
+          sender_name: username,
+          message: originalText
+        })
       });
       const data = await res.json();
       if (data.error) {
@@ -44,7 +48,7 @@ function ChatInterface({ roomId, username, onLeave }) {
          setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
       }
     } catch (err) {
-      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST.", is_ai: true }]);
+      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST. CHECK SERVER.", is_ai: true }]);
     }
     setLoading(false);
   };
@@ -57,68 +61,54 @@ function ChatInterface({ roomId, username, onLeave }) {
     setInputText(prompt);
   };
 
-  // --- NEW: SMART FORMATTER (Parses **Bold** and Lines) ---
-  const renderFormattedText = (text) => {
-    if (!text) return "";
-    return text.split('\n').map((line, i) => (
-      <div key={i} style={{ minHeight: '1.2em', marginBottom: '4px' }}>
-        {line.split(/(\*\*.*?\*\*)/).map((part, j) => {
-          if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={j} style={{ color: '#fff' }}>{part.slice(2, -2)}</strong>;
-          }
-          return <span key={j}>{part}</span>;
-        })}
-      </div>
-    ));
+  // --- NEW FUNCTION: GENERATE INVITE LINK ---
+  const copyInviteLink = () => {
+    // Creates a link like: https://careco-pilotai.com/?join=btr
+    const link = `${window.location.origin}/?join=${roomId}`;
+    navigator.clipboard.writeText(link);
+    
+    setCopyStatus('LINK COPIED! SHARE IT.');
+    setTimeout(() => setCopyStatus(''), 3000); // Clear message after 3 seconds
   };
-  // FUNCTION TO DOWNLOAD CHAT HISTORY
-const handleSaveSession = () => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const chatContent = messages.map(m => 
-    `[${m.sender_name.toUpperCase()}]:\n${m.message}\n`
-  ).join('\n-------------------\n');
-
-  const blob = new Blob([chatContent], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `WAR-ROOM-LOG-${timestamp}.txt`;
-  a.click();
-};
 
   return (
     <div className="chat-container">
+      {/* --- HEADER --- */}
       <header className="chat-header">
         <div>
-          <h1>WAR ROOM: {username.split('@')[0]}</h1>
-          <span className="online-status">ONLINE | {username}</span>
+          <h1>WAR ROOM: {roomId}</h1>
+          <span className="online-status">OPERATIVE: {username}</span>
         </div>
         <div className="header-controls">
-          <button className="control-btn" onClick={handleSaveSession} title="Save Session">💾</button>
+          {/* INVITE BUTTON */}
+          <button className="control-btn" onClick={copyInviteLink} title="Invite Team">
+            {copyStatus || "🔗 INVITE"}
+          </button>
+          <button className="control-btn" title="Save Session">💾</button>
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
       </header>
 
+      {/* --- CHAT WINDOW --- */}
       <div className="chat-window">
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
             <span className="sender-label">{msg.sender_name}</span>
-            {/* USE THE NEW FORMATTER HERE */}
-            <div className="smart-text">
-              {renderFormattedText(msg.message)}
-            </div>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
           </div>
         ))}
-        {loading && <div className="message-box ai">... INTELLIGENCE PROCESSING ...</div>}
+        {loading && <div className="message-box ai">... ANALYZING DATA STREAM ...</div>}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* --- INPUT AREA --- */}
       <div className="input-area">
         <div className="quick-actions">
           <button className="action-btn" onClick={() => handleQuickAction('IDEAS')}>💡 IDEAS</button>
           <button className="action-btn" onClick={() => handleQuickAction('RISKS')}>⚠️ RISKS</button>
           <button className="action-btn" onClick={() => handleQuickAction('PLAN')}>🚀 PLAN</button>
         </div>
+
         <div className="input-wrapper">
           <button className="attach-btn">📎</button>
           <input 

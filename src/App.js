@@ -4,11 +4,10 @@ import LandingPage from './LandingPage';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import './Main.css';
 
-// FIX: HARDCODED LINK TO THE LIVE BRAIN
-// This allows Vercel AND Render to both talk to the backend.
+// FIX: Hardcoded to the LIVE Render Backend
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; 
 
-function Login({ onLogin, onBack }) {
+function Login({ onLogin, onBack, targetRoom }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,30 +34,33 @@ function Login({ onLogin, onBack }) {
       const payload = { username: email, password };
       if (isRegistering) payload.device_id = deviceId;
 
-      // USES THE HARDCODED URL
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
 
-      if (res.ok) { onLogin(data.username, data.room_id); } 
+      if (res.ok) { 
+        // CRITICAL CHANGE: If a targetRoom (Invite) exists, use that. Otherwise use their own room.
+        const finalRoom = targetRoom || data.room_id;
+        onLogin(data.username, finalRoom); 
+      } 
       else { setError(`⚠️ ${data.error || 'ACCESS DENIED'}`); }
-    } catch (err) { 
-        setError("⚠️ CONNECTION FAILED"); 
-        // Optional: Alert to debug if it fails again
-        // alert(err.message);
-    }
+    } catch (err) { setError("⚠️ CONNECTION FAILED"); }
     setIsLoading(false);
   };
 
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1 className="glitch" data-text={isRegistering ? "NEW WARRIOR" : "WAR ROOM ACCESS"}>
-          {isRegistering ? "NEW WARRIOR" : "WAR ROOM ACCESS"}
+        {/* Dynamic Header based on Invite Status */}
+        <h1 className="glitch" data-text={targetRoom ? "JOIN SQUAD" : "WAR ROOM ACCESS"}>
+          {targetRoom ? "JOIN SQUAD" : "WAR ROOM ACCESS"}
         </h1>
-        <p className="subtitle">{isRegistering ? "INITIATE PROTOCOL" : "IDENTIFICATION REQUIRED"}</p>
+        
+        <p className="subtitle">
+          {targetRoom ? `TARGET ROOM: ${targetRoom}` : (isRegistering ? "INITIATE PROTOCOL" : "IDENTIFICATION REQUIRED")}
+        </p>
         
         <div className="input-group">
           <label>STRATEGIC ID (EMAIL)</label>
@@ -92,19 +94,39 @@ function App() {
   const [hasEntered, setHasEntered] = useState(false);
   const [roomId, setRoomId] = useState(null);
   const [username, setUsername] = useState('');
+  const [inviteRoom, setInviteRoom] = useState(null); // New State for Invite
 
   useEffect(() => {
+    // 1. Check for ?join=xyz in URL
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = params.get('join');
+    if (joinCode) {
+      setInviteRoom(joinCode);
+      setHasEntered(true); // Skip Landing Page if invited
+    }
+
+    // 2. Check LocalStorage
     const storedUser = localStorage.getItem('war_room_user');
     const storedRoom = localStorage.getItem('war_room_id');
     if (storedUser && storedRoom) {
-      setUsername(storedUser); setRoomId(storedRoom); setIsLoggedIn(true);
+      // If invited, ignore stored room and ask to login/confirm
+      if (!joinCode) {
+        setUsername(storedUser); 
+        setRoomId(storedRoom); 
+        setIsLoggedIn(true);
+      }
     }
   }, []);
 
   const handleLogin = (user, room) => {
     localStorage.setItem('war_room_user', user);
     localStorage.setItem('war_room_id', room);
-    setUsername(user); setRoomId(room); setIsLoggedIn(true);
+    setUsername(user); 
+    setRoomId(room); 
+    setIsLoggedIn(true);
+    
+    // Clear the URL to make it clean
+    window.history.replaceState({}, document.title, "/");
   };
 
   const handleLogout = () => {
@@ -121,7 +143,7 @@ function App() {
     return <ChatInterface roomId={roomId} username={username} onLeave={handleLogout} />;
   }
 
-  return <Login onLogin={handleLogin} onBack={() => setHasEntered(false)} />;
+  return <Login onLogin={handleLogin} onBack={() => setHasEntered(false)} targetRoom={inviteRoom} />;
 }
 
 export default App;
