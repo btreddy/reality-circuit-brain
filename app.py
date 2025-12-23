@@ -21,13 +21,13 @@ genai.configure(api_key=GEMINI_KEY)
 def get_db_connection():
     return psycopg2.connect(DB_URL)
 
-# --- DATABASE AUTO-SETUP (Now with Device Tracking) ---
+# --- DATABASE SETUP (Now with Message Counting) ---
 def init_db():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Create USERS table with DEVICE_ID column
+        # Users Table: Now tracks 'message_count'
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -35,11 +35,11 @@ def init_db():
                 password TEXT NOT NULL,
                 room_id TEXT NOT NULL,
                 device_id TEXT,
+                message_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         
-        # Create CHATS table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS room_chats (
                 id SERIAL PRIMARY KEY,
@@ -54,7 +54,7 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print("✅ DATABASE SECURITY LAYERS ACTIVE.")
+        print("✅ DATABASE METERS ACTIVE.")
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
@@ -82,51 +82,42 @@ def generate_smart_content(prompt_text, file_data=None, mime_type=None):
 
 @app.route('/')
 def home():
-    return "WAR ROOM SECURITY: ACTIVE"
+    return "WAR ROOM PAYWALL: ACTIVE"
 
-# --- THE IRON GATE (Signup Logic) ---
 @app.route('/api/signup', methods=['POST'])
 def signup():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    device_id = data.get('device_id') # <--- The Fingerprint
+    device_id = data.get('device_id')
 
     if not device_id:
-        return jsonify({"error": "Security Check Failed (No Device ID)"}), 400
+        return jsonify({"error": "Security Check Failed"}), 400
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # 1. CHECK FOR DEVICE BAN (Has this laptop signed up before?)
-    # (Comment this out if you want to allow multiple accounts per laptop for testing)
+    # Check Device Lock
     cur.execute("SELECT * FROM users WHERE device_id = %s", (device_id,))
-    existing_device = cur.fetchone()
-    
-    if existing_device:
-        cur.close()
-        conn.close()
+    if cur.fetchone():
+        cur.close(); conn.close()
         return jsonify({"error": "DEVICE ALREADY REGISTERED. PLEASE LOG IN."}), 403
 
-    # 2. CHECK FOR EMAIL DUPLICATE
+    # Check Username
     cur.execute("SELECT * FROM users WHERE username = %s", (username,))
-    existing_user = cur.fetchone()
-    
-    if existing_user:
-        cur.close()
-        conn.close()
+    if cur.fetchone():
+        cur.close(); conn.close()
         return jsonify({"error": "User already exists"}), 400
         
-    # 3. CREATE NEW WARRIOR
+    # Create User (Starts with 0 messages)
     room_id = username.split('@')[0]
     try:
         cur.execute(
-            "INSERT INTO users (username, password, room_id, device_id) VALUES (%s, %s, %s, %s)", 
+            "INSERT INTO users (username, password, room_id, device_id, message_count) VALUES (%s, %s, %s, %s, 0)", 
             (username, password, room_id, device_id)
         )
         conn.commit()
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
         return jsonify({"username": username, "room_id": room_id})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -136,15 +127,13 @@ def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    # We can also track device_id on login if we want to lock account sharing later
 
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute("SELECT * FROM users WHERE username = %s", (username,))
         user = cur.fetchone()
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
 
         if user and user['password'] == password:
             return jsonify({"username": username, "room_id": user['room_id']})
@@ -153,6 +142,7 @@ def login():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# --- THE METERED CHAT ROUTE ---
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -163,18 +153,34 @@ def send_chat():
     mime_type = data.get('mime_type')
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    # 1. CHECK CREDIT LIMIT
+    cur.execute("SELECT message_count FROM users WHERE username = %s", (sender_name,))
+    user_record = cur.fetchone()
+    
+    if user_record and user_record['message_count'] >= 3:
+        cur.close(); conn.close()
+        # ⚠️ RETURN ERROR 402 (Payment Required)
+        return jsonify({"error": "LIMIT_REACHED"}), 402
+
+    # 2. IF OK, INCREMENT COUNT
+    cur.execute("UPDATE users SET message_count = message_count + 1 WHERE username = %s", (sender_name,))
+    conn.commit()
+
+    # 3. PROCESS CHAT NORMALLY
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, sender_name, message if not file_data else f"[FILE] {message}", False))
     conn.commit()
     
+    # 4. GENERATE AI REPLY
     ai_reply = generate_smart_content(f"User: {message}", file_data, mime_type)
     
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, "Reality Circuit", ai_reply, True))
     conn.commit()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
+    
     return jsonify({"ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
@@ -184,8 +190,7 @@ def get_history():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
     msgs = cur.fetchall()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
     return jsonify(msgs)
 
 @app.route('/api/chat/clear', methods=['POST'])
@@ -195,11 +200,10 @@ def clear_history():
     cur = conn.cursor()
     cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
     conn.commit()
-    cur.close()
-    conn.close()
+    cur.close(); conn.close()
     return jsonify({"status": "CLEARED"})
 
-# --- NUCLEAR RESET (UPDATED TO WIPE DEVICE IDS TOO) ---
+# --- NUCLEAR RESET ---
 @app.route('/api/nuke_database', methods=['GET'])
 def nuke_database():
     try:
@@ -208,10 +212,9 @@ def nuke_database():
         cur.execute("DROP TABLE IF EXISTS users CASCADE;")
         cur.execute("DROP TABLE IF EXISTS room_chats CASCADE;")
         conn.commit()
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
         init_db()
-        return "⚠️ SYSTEM ALERT: DATABASE WIPED. NEW SECURITY PROTOCOLS INSTALLED."
+        return "⚠️ SYSTEM ALERT: DATABASE WIPED. METERS & LOCKS INSTALLED."
     except Exception as e:
         return f"RESET FAILED: {str(e)}"
 

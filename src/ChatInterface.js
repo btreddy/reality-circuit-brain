@@ -2,23 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './Main.css';
 
-// ⚠️ VERIFY THIS MATCHES YOUR BACKEND URL
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null); 
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isLimitReached, setIsLimitReached] = useState(false); // <--- NEW STATE
   
   const messagesEndRef = useRef(null);
   const prevMessageCount = useRef(0);
   const fileInputRef = useRef(null); 
 
-  // 1. SMART SCROLL
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
 
   useEffect(() => {
     if (messages.length > prevMessageCount.current) {
@@ -27,10 +24,9 @@ function ChatInterface({ roomId, username, onLeave }) {
     }
   }, [messages]);
 
-  // 2. LOAD HISTORY (CRITICAL FIX HERE)
   useEffect(() => {
     fetchHistory();
-    const interval = setInterval(fetchHistory, 3000); // Polling every 3 seconds
+    const interval = setInterval(fetchHistory, 3000);
     return () => clearInterval(interval);
   }, [roomId]);
 
@@ -38,27 +34,18 @@ function ChatInterface({ roomId, username, onLeave }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
-      
       if (Array.isArray(data)) {
-        // --- THE FIX IS HERE ---
-        // We map DB columns (message, sender_name) to UI props (text, sender)
         const formatted = data.map(msg => ({
           id: msg.id,
-          text: msg.message,        // FIX: DB uses 'message', UI uses 'text'
-          sender: msg.sender_name,  // FIX: DB uses 'sender_name', UI uses 'sender'
+          text: msg.message,
+          sender: msg.sender_name,
           isUser: !msg.is_ai
         }));
-        
-        setMessages(prev => {
-            // Only update if length changed to prevent flickering
-            if (prev.length === formatted.length) return prev;
-            return formatted;
-        });
+        setMessages(prev => { if (prev.length === formatted.length) return prev; return formatted; });
       }
     } catch (err) { console.error("History Error:", err); }
   };
 
-  // --- FILE HANDLING HELPER ---
   const convertFileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -68,28 +55,19 @@ function ChatInterface({ roomId, username, onLeave }) {
     });
   };
 
-  // 3. SEND MESSAGE
   const handleSend = async (textOverride) => {
     const textToSend = textOverride || inputText;
     if (!textToSend.trim() && !selectedFile) return;
 
-    // Optimistic UI Update
-    const displayMsg = selectedFile 
-        ? `[UPLOADING FILE: ${selectedFile.name}] ${textToSend}` 
-        : textToSend;
-        
+    // Optimistic Update
+    const displayMsg = selectedFile ? `[UPLOADING FILE: ${selectedFile.name}] ${textToSend}` : textToSend;
     const tempMsg = { id: Date.now(), text: displayMsg, sender: username, isUser: true };
     setMessages(prev => [...prev, tempMsg]);
     setInputText('');
     setIsLoading(true);
 
     try {
-      let payload = {
-        room_id: roomId,
-        sender_name: username,
-        message: textToSend
-      };
-
+      let payload = { room_id: roomId, sender_name: username, message: textToSend };
       if (selectedFile) {
         const base64Data = await convertFileToBase64(selectedFile);
         payload.file_data = base64Data;
@@ -97,23 +75,24 @@ function ChatInterface({ roomId, username, onLeave }) {
         setSelectedFile(null); 
       }
 
-      await fetch(`${API_BASE_URL}/api/chat/send`, {
+      const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      
-      // Force immediate refresh
-      fetchHistory();
 
-    } catch (err) {
-      console.error("Send Failed:", err);
-      alert("Transmission Failed. Check connection.");
-    }
+      // --- THE LIMIT CHECK ---
+      if (res.status === 402) {
+        setIsLimitReached(true); // <--- TRIGGER PAYWALL
+        setIsLoading(false);
+        return;
+      }
+
+      fetchHistory();
+    } catch (err) { console.error("Send Failed:", err); }
     setIsLoading(false);
   };
 
-  // HANDLERS
   const handleWipe = async () => {
     if (!window.confirm("☢️ WARNING: Wipe all data?")) return;
     await fetch(`${API_BASE_URL}/api/chat/clear`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ room_id: roomId }) });
@@ -126,6 +105,31 @@ function ChatInterface({ roomId, username, onLeave }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `WAR_ROOM_${roomId}.txt`; a.click();
   };
+
+  // --- THE PAYWALL SCREEN ---
+  if (isLimitReached) {
+    return (
+      <div className="login-container">
+        <div className="login-box" style={{borderColor: 'red'}}>
+          <h1 className="glitch" data-text="SYSTEM HALTED" style={{color: 'red'}}>SYSTEM HALTED</h1>
+          <p className="subtitle" style={{color: '#ff4444'}}>CREDIT LIMIT EXCEEDED</p>
+          
+          <div style={{margin: '30px 0', border: '1px dashed red', padding: '15px'}}>
+            <p>Your 3 Free Strategic Queries are exhausted.</p>
+            <p>To continue using Gemini 2.0 Intelligence, upgrade your clearance level.</p>
+          </div>
+
+          <button className="login-btn" style={{borderColor: 'red', color: 'red'}} onClick={() => alert("Redirecting to Payment Gateway...")}>
+            SUBSCRIBE (₹999/mo)
+          </button>
+          
+          <div className="toggle-link" onClick={onLeave} style={{color: 'red'}}>
+            [ ABORT MISSION / LOGOUT ]
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="chat-container">
@@ -147,7 +151,7 @@ function ChatInterface({ roomId, username, onLeave }) {
           <div key={index} className={`message-row ${msg.isUser ? 'user-row' : 'ai-row'}`}>
             <div className={`message-bubble ${msg.isUser ? 'user-bubble' : 'ai-bubble'}`}>
               <div className="message-sender">{msg.sender}</div>
-              <ReactMarkdown>{msg.text || "..."}</ReactMarkdown> {/* Safety fallback */}
+              <ReactMarkdown>{msg.text || "..."}</ReactMarkdown>
             </div>
           </div>
         ))}
@@ -165,18 +169,13 @@ function ChatInterface({ roomId, username, onLeave }) {
         
         <div className="input-wrapper">
           <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={(e) => setSelectedFile(e.target.files[0])} 
-            style={{display: 'none'}} 
-            accept="image/*,application/pdf"
+            type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files[0])} 
+            style={{display: 'none'}} accept="image/*,application/pdf"
           />
           <button onClick={() => fileInputRef.current.click()} className="attach-btn">📎</button>
           
           <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            type="text" value={inputText} onChange={(e) => setInputText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
             placeholder={selectedFile ? "Type instructions for this file..." : "Type message..."}
           />
