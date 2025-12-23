@@ -229,23 +229,31 @@ def nuke_database():
     except Exception as e:
         return f"RESET FAILED: {str(e)}"
 
-# --- BACKDOOR ADMIN CREATION ---
+# --- BACKDOOR: FORCE-CREATE YOUR VIP USER ---
 @app.route('/api/force_create_admin', methods=['GET'])
 def force_create_admin():
-    new_admin_email = "admin@warroom.com"
-    new_admin_pass = "admin123"
+    # CHANGE THIS TO YOUR EXACT EMAIL
+    new_admin_email = "btr@sld.com"  
+    # SET A SIMPLE PASSWORD (You can change it later if you build a change-pass feature)
+    new_admin_pass = "btr_sld" 
+    
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        # We use 'ADMIN_CONSOLE' as device_id to bypass the lock on your laptop
         cur.execute("""
             INSERT INTO users (username, password, room_id, device_id, message_count) 
-            VALUES (%s, %s, 'admin_hq', 'ADMIN_CONSOLE', 0)
+            VALUES (%s, %s, 'btr_hq', 'ADMIN_CONSOLE', 0)
         """, (new_admin_email, new_admin_pass))
-        conn.commit(); cur.close(); conn.close()
-        return f"✅ SUCCESS: Created {new_admin_email}"
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return f"✅ SUCCESS: Created User '{new_admin_email}'. Login with password '{new_admin_pass}'."
+    
     except Exception as e:
-        return f"❌ FAILED: {str(e)}"
-
+        return f"❌ FAILED: {str(e)} (User likely already exists)"
 if __name__ == '__main__':
     with app.app_context():
         init_db()
