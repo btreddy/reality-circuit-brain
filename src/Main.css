@@ -297,4 +297,32 @@ body {
 .float-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 0 15px #00ff41;
+}/* --- MOBILE OPTIMIZATION FIXES --- */
+
+/* 1. Stop the screen from scrolling sideways */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* 2. Fix the Landing Page Container */
+.landing-container {
+  width: 100vw;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 3. Pull Buttons Closer on Mobile */
+@media (max-width: 768px) {
+  .floating-actions {
+    right: 10px;    /* Closer to edge */
+    bottom: 15px;   /* Slightly lower */
+  }
+  
+  .float-btn {
+    width: 45px;    /* Slightly smaller on mobile */
+    height: 45px;
+    font-size: 1.2rem;
+  }
 }

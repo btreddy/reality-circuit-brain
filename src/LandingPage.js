@@ -10,7 +10,12 @@ function LandingPage({ onEnter }) {
     setStatus('TRANSMITTING...');
     
     try {
-      const res = await fetch('https://careco-pilotai.com/api/contact', { // Use your real domain
+      // FIX: Use relative path (starts with /api) instead of full domain
+      const res = await fetch('/api/contact', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
