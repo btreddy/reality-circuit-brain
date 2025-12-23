@@ -8,7 +8,7 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURATION ---
+# --- 1. CONFIGURATION ---
 raw_db_url = os.environ.get("DATABASE_URL")
 if raw_db_url and raw_db_url.startswith("postgres://"):
     DB_URL = raw_db_url.replace("postgres://", "postgresql://", 1)
@@ -18,16 +18,17 @@ else:
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
+# --- 2. DATABASE CONNECTION ---
 def get_db_connection():
     return psycopg2.connect(DB_URL)
 
-# --- DATABASE SETUP (Now with Message Counting) ---
+# --- 3. DATABASE AUTO-INIT ---
 def init_db():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Users Table: Now tracks 'message_count'
+        # Create USERS Table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -40,6 +41,7 @@ def init_db():
             );
         """)
         
+        # Create CHATS Table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS room_chats (
                 id SERIAL PRIMARY KEY,
@@ -54,16 +56,14 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print("✅ DATABASE METERS ACTIVE.")
+        print("✅ DATABASE & TABLES READY.")
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-with app.app_context():
-    init_db()
-
-# --- INTELLIGENCE CORE ---
+# --- 4. INTELLIGENCE CORE ---
 def generate_smart_content(prompt_text, file_data=None, mime_type=None):
     try:
+        # Try Primary Model
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         if file_data:
             response = model.generate_content([prompt_text, {"mime_type": mime_type, "data": file_data}])
@@ -72,17 +72,18 @@ def generate_smart_content(prompt_text, file_data=None, mime_type=None):
         return response.text.strip()
     except:
         try:
+            # Fallback to Backup Model
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt_text)
             return response.text.strip()
         except Exception as e:
             return f"SYSTEM FAILURE: {str(e)}"
 
-# --- ROUTES ---
+# --- 5. ROUTES ---
 
 @app.route('/')
 def home():
-    return "WAR ROOM PAYWALL: ACTIVE"
+    return "WAR ROOM HQ: ONLINE"
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -91,25 +92,28 @@ def signup():
     password = data.get('password')
     device_id = data.get('device_id')
 
+    # Security: Require Device ID
     if not device_id:
-        return jsonify({"error": "Security Check Failed"}), 400
+        return jsonify({"error": "Security Check Failed (No Device ID)"}), 400
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Check Device Lock
+    # 1. Check if Device is Banned (Already Registered)
     cur.execute("SELECT * FROM users WHERE device_id = %s", (device_id,))
-    if cur.fetchone():
+    existing_device = cur.fetchone()
+    
+    if existing_device:
         cur.close(); conn.close()
         return jsonify({"error": "DEVICE ALREADY REGISTERED. PLEASE LOG IN."}), 403
 
-    # Check Username
+    # 2. Check if Email Exists
     cur.execute("SELECT * FROM users WHERE username = %s", (username,))
     if cur.fetchone():
         cur.close(); conn.close()
         return jsonify({"error": "User already exists"}), 400
         
-    # Create User (Starts with 0 messages)
+    # 3. Create User
     room_id = username.split('@')[0]
     try:
         cur.execute(
@@ -142,8 +146,7 @@ def login():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- THE METERED CHAT ROUTE ---
-# --- THE METERED CHAT ROUTE (WITH ADMIN BYPASS) ---
+# --- CHAT ROUTE (WITH VIP LIST) ---
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
     data = request.json
@@ -153,8 +156,8 @@ def send_chat():
     file_data = data.get('file_data')
     mime_type = data.get('mime_type')
 
-    # ⚠️ MASTER KEY: Add your email(s) here to get UNLIMITED ACCESS
-    ADMIN_USERS = ["admin@sld.com", "btr@sld.com", "testing@sld.com"] 
+    # ⚠️ VIP LIST: Add your emails here for UNLIMITED ACCESS
+    ADMIN_USERS = ["admin@warroom.com", "btr@sld.com", "btr3@gmail.com", "testing2@gmail.com"]
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -163,30 +166,55 @@ def send_chat():
     cur.execute("SELECT message_count FROM users WHERE username = %s", (sender_name,))
     user_record = cur.fetchone()
     
-    # LOGIC: If count >= 3 AND user is NOT an Admin -> BLOCK THEM
+    # If user is NOT in Admin list AND has >= 3 messages -> BLOCK
     if user_record and user_record['message_count'] >= 3 and sender_name not in ADMIN_USERS:
         cur.close(); conn.close()
         return jsonify({"error": "LIMIT_REACHED"}), 402
 
-    # 2. INCREMENT COUNT (We still count admins, but we never block them)
+    # 2. INCREMENT COUNT
     cur.execute("UPDATE users SET message_count = message_count + 1 WHERE username = %s", (sender_name,))
     conn.commit()
 
-    # 3. PROCESS CHAT NORMALLY
+    # 3. SAVE USER MESSAGE
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, sender_name, message if not file_data else f"[FILE] {message}", False))
     conn.commit()
     
-    # 4. GENERATE AI REPLY
-    ai_reply = generate_smart_content(f"User: {message}", file_data, mime_type)
-    
+    # 4. GENERATE AI REPLY (The Brain)
+    try:
+        ai_reply = generate_smart_content(f"User: {message}", file_data, mime_type)
+    except Exception as e:
+        ai_reply = "System Malfunction: AI Core Unresponsive."
+
+    # 5. SAVE AI REPLY
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, "Reality Circuit", ai_reply, True))
     conn.commit()
     cur.close(); conn.close()
     
     return jsonify({"ai_reply": ai_reply})
-# --- NUCLEAR RESET ---
+
+@app.route('/api/chat/history', methods=['GET'])
+def get_history():
+    room_id = request.args.get('room_id')
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
+    msgs = cur.fetchall()
+    cur.close(); conn.close()
+    return jsonify(msgs)
+
+@app.route('/api/chat/clear', methods=['POST'])
+def clear_history():
+    room_id = request.json.get('room_id')
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
+    conn.commit()
+    cur.close(); conn.close()
+    return jsonify({"status": "CLEARED"})
+
+# --- DATABASE RESET TOOL ---
 @app.route('/api/nuke_database', methods=['GET'])
 def nuke_database():
     try:
@@ -197,9 +225,26 @@ def nuke_database():
         conn.commit()
         cur.close(); conn.close()
         init_db()
-        return "⚠️ SYSTEM ALERT: DATABASE WIPED. METERS & LOCKS INSTALLED."
+        return "⚠️ SYSTEM ALERT: DATABASE WIPED. NEW SECURITY PROTOCOLS INSTALLED."
     except Exception as e:
         return f"RESET FAILED: {str(e)}"
+
+# --- BACKDOOR ADMIN CREATION ---
+@app.route('/api/force_create_admin', methods=['GET'])
+def force_create_admin():
+    new_admin_email = "admin@warroom.com"
+    new_admin_pass = "admin123"
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO users (username, password, room_id, device_id, message_count) 
+            VALUES (%s, %s, 'admin_hq', 'ADMIN_CONSOLE', 0)
+        """, (new_admin_email, new_admin_pass))
+        conn.commit(); cur.close(); conn.close()
+        return f"✅ SUCCESS: Created {new_admin_email}"
+    except Exception as e:
+        return f"❌ FAILED: {str(e)}"
 
 if __name__ == '__main__':
     with app.app_context():
