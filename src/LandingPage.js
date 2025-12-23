@@ -7,10 +7,10 @@ function LandingPage({ onEnter }) {
       {/* HERO SECTION */}
       <header className="landing-hero">
         <h1 className="glitch" data-text="REALITY CIRCUIT">REALITY CIRCUIT</h1>
-        <p className="subtitle">AI INNOVATION & SOFTWARE DEVELOPMENT</p>
+        <p className="subtitle">INTELLIGENCE. ACCELERATED. SECURED.</p>
         <p className="hero-desc">
           We don't just write code. We partner with visionaries to turn 
-          complex ideas into deployed software. Powered by Gemini 2.0.
+          complex ideas into deployed software AI Care co-Pilot .
         </p>
         <button className="login-btn hero-btn" onClick={onEnter}>
           ENTER THE WAR ROOM &gt;&gt;
@@ -38,7 +38,7 @@ function LandingPage({ onEnter }) {
       {/* FOOTER */}
       <footer className="landing-footer">
         <p>HYDERABAD • TELANGANA • GLOBAL</p>
-        <p className="contact-info">Partner with us: btr@sld.com</p>
+        <p className="contact-info">Partner with us: btr@safelandddeal.com</p>
       </footer>
     </div>
   );
