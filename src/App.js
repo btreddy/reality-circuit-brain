@@ -4,7 +4,8 @@ import LandingPage from './LandingPage';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import './Main.css';
 
-const API_BASE_URL = "https://careco-pilotai.com"; // Your Live Domain
+// FIX: Use relative path (empty string) to auto-detect the server
+const API_BASE_URL = ""; 
 
 function Login({ onLogin, onBack }) {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -33,6 +34,7 @@ function Login({ onLogin, onBack }) {
       const payload = { username: email, password };
       if (isRegistering) payload.device_id = deviceId;
 
+      // FIX: Using relative path prevents CORS/Domain errors
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -82,7 +84,7 @@ function Login({ onLogin, onBack }) {
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [hasEntered, setHasEntered] = useState(false); // <--- NEW STATE: Tracks if they clicked "Enter"
+  const [hasEntered, setHasEntered] = useState(false);
   const [roomId, setRoomId] = useState(null);
   const [username, setUsername] = useState('');
 
@@ -106,18 +108,17 @@ function App() {
     setIsLoggedIn(false); setRoomId(null); setUsername(''); setHasEntered(false);
   };
 
-  // --- LOGIC UPDATE ---
-  // Always show Landing Page first (unless 'hasEntered' is true)
+  // 1. Always show Landing Page first (unless 'Enter' was clicked)
   if (!hasEntered) {
     return <LandingPage onEnter={() => setHasEntered(true)} />;
   }
 
-  // If they clicked Enter AND are logged in -> Show Chat
+  // 2. If Entered AND Logged In -> Show Chat
   if (isLoggedIn) {
     return <ChatInterface roomId={roomId} username={username} onLeave={handleLogout} />;
   }
 
-  // If they clicked Enter but NOT logged in -> Show Login
+  // 3. If Entered but NOT Logged In -> Show Login
   return <Login onLogin={handleLogin} onBack={() => setHasEntered(false)} />;
 }
 
