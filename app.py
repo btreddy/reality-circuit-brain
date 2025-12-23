@@ -8,7 +8,7 @@ import google.generativeai as genai
 app = Flask(__name__)
 CORS(app)
 
-# --- 1. CONFIGURATION & AUTO-FIXES ---
+# --- CONFIGURATION ---
 raw_db_url = os.environ.get("DATABASE_URL")
 if raw_db_url and raw_db_url.startswith("postgres://"):
     DB_URL = raw_db_url.replace("postgres://", "postgresql://", 1)
@@ -18,28 +18,28 @@ else:
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
-# --- 2. DATABASE CONNECTION ---
 def get_db_connection():
     return psycopg2.connect(DB_URL)
 
-# --- 3. THE SELF-HEALING SYSTEM (Critical Fix) ---
-# This runs once when the app starts to create missing tables.
+# --- DATABASE AUTO-SETUP (Now with Device Tracking) ---
 def init_db():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Create USERS Table (Fixes Login Crash)
+        # Create USERS table with DEVICE_ID column
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                room_id TEXT NOT NULL
+                room_id TEXT NOT NULL,
+                device_id TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         
-        # Create CHATS Table (Fixes History)
+        # Create CHATS table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS room_chats (
                 id SERIAL PRIMARY KEY,
@@ -54,17 +54,15 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print("✅ DATABASE TABLES VERIFIED & READY.")
+        print("✅ DATABASE SECURITY LAYERS ACTIVE.")
     except Exception as e:
-        print(f"⚠️ DATABASE INIT FAILED: {e}")
+        print(f"⚠️ DB INIT ERROR: {e}")
 
-# Run the fix immediately
 with app.app_context():
     init_db()
 
-# --- 4. INTELLIGENCE CORE (Gemini) ---
+# --- INTELLIGENCE CORE ---
 def generate_smart_content(prompt_text, file_data=None, mime_type=None):
-    # Try Gemini 2.0 (The Genius), fallback to 1.5 (The Reliable)
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         if file_data:
@@ -73,7 +71,6 @@ def generate_smart_content(prompt_text, file_data=None, mime_type=None):
             response = model.generate_content(prompt_text)
         return response.text.strip()
     except:
-        # Fallback
         try:
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt_text)
@@ -81,37 +78,65 @@ def generate_smart_content(prompt_text, file_data=None, mime_type=None):
         except Exception as e:
             return f"SYSTEM FAILURE: {str(e)}"
 
-# --- 5. ROUTES ---
+# --- ROUTES ---
 
 @app.route('/')
 def home():
-    return "WAR ROOM HQ ONLINE. DATABASE ACTIVE."
+    return "WAR ROOM SECURITY: ACTIVE"
 
+# --- THE IRON GATE (Signup Logic) ---
 @app.route('/api/signup', methods=['POST'])
 def signup():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    
-    # Simple Logic: Room ID = Username
-    room_id = username.split('@')[0]
+    device_id = data.get('device_id') # <--- The Fingerprint
 
+    if not device_id:
+        return jsonify({"error": "Security Check Failed (No Device ID)"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # 1. CHECK FOR DEVICE BAN (Has this laptop signed up before?)
+    # (Comment this out if you want to allow multiple accounts per laptop for testing)
+    cur.execute("SELECT * FROM users WHERE device_id = %s", (device_id,))
+    existing_device = cur.fetchone()
+    
+    if existing_device:
+        cur.close()
+        conn.close()
+        return jsonify({"error": "DEVICE ALREADY REGISTERED. PLEASE LOG IN."}), 403
+
+    # 2. CHECK FOR EMAIL DUPLICATE
+    cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+    existing_user = cur.fetchone()
+    
+    if existing_user:
+        cur.close()
+        conn.close()
+        return jsonify({"error": "User already exists"}), 400
+        
+    # 3. CREATE NEW WARRIOR
+    room_id = username.split('@')[0]
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO users (username, password, room_id) VALUES (%s, %s, %s)", (username, password, room_id))
+        cur.execute(
+            "INSERT INTO users (username, password, room_id, device_id) VALUES (%s, %s, %s, %s)", 
+            (username, password, room_id, device_id)
+        )
         conn.commit()
         cur.close()
         conn.close()
         return jsonify({"username": username, "room_id": room_id})
     except Exception as e:
-        return jsonify({"error": "User already exists"}), 400
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    # We can also track device_id on login if we want to lock account sharing later
 
     try:
         conn = get_db_connection()
@@ -137,23 +162,19 @@ def send_chat():
     file_data = data.get('file_data')
     mime_type = data.get('mime_type')
 
-    # Save User Message
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
-                (room_id, sender_name, message, False))
+                (room_id, sender_name, message if not file_data else f"[FILE] {message}", False))
     conn.commit()
     
-    # Generate AI Reply
     ai_reply = generate_smart_content(f"User: {message}", file_data, mime_type)
     
-    # Save AI Reply
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, "Reality Circuit", ai_reply, True))
     conn.commit()
     cur.close()
     conn.close()
-    
     return jsonify({"ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
@@ -177,26 +198,24 @@ def clear_history():
     cur.close()
     conn.close()
     return jsonify({"status": "CLEARED"})
-# --- NUCLEAR RESET SWITCH (Run once to fix DB) ---
+
+# --- NUCLEAR RESET (UPDATED TO WIPE DEVICE IDS TOO) ---
 @app.route('/api/nuke_database', methods=['GET'])
 def nuke_database():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # 1. Destroy old tables
         cur.execute("DROP TABLE IF EXISTS users CASCADE;")
         cur.execute("DROP TABLE IF EXISTS room_chats CASCADE;")
         conn.commit()
         cur.close()
         conn.close()
-        
-        # 2. Rebuild fresh tables
         init_db()
-        return "⚠️ SYSTEM ALERT: DATABASE WIPED AND REBUILT. YOU MAY NOW SIGN UP."
+        return "⚠️ SYSTEM ALERT: DATABASE WIPED. NEW SECURITY PROTOCOLS INSTALLED."
     except Exception as e:
         return f"RESET FAILED: {str(e)}"
 
 if __name__ == '__main__':
-    # Initialize DB locally if running directly
-    init_db()
+    with app.app_context():
+        init_db()
     app.run(debug=True)
