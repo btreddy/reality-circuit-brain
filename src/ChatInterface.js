@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Main.css';
 
-// FIX: Use relative path (empty string) so it works on any domain automatically
-const API_BASE_URL = "";
+// FIX: HARDCODED URL - Matches the working Login URL
+const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; 
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
@@ -20,7 +20,14 @@ function ChatInterface({ roomId, username, onLeave }) {
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`)
       .then(res => res.json())
-      .then(data => setMessages(data))
+      .then(data => {
+        // If the server returns an error object, handle it gracefully
+        if (Array.isArray(data)) {
+            setMessages(data);
+        } else {
+            console.error("History format error:", data);
+        }
+      })
       .catch(err => console.error("History Error:", err));
   }, [roomId]);
 
@@ -28,15 +35,16 @@ function ChatInterface({ roomId, username, onLeave }) {
   const sendMessage = async () => {
     if (!inputText.trim()) return;
     
-    // Optimistic UI: Add User Message Instantly
+    // Optimistic UI
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
     
     setLoading(true);
     const originalText = inputText;
-    setInputText(''); // Clear Input
+    setInputText(''); 
 
     try {
+      // USES THE HARDCODED LINK
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,6 +63,7 @@ function ChatInterface({ roomId, username, onLeave }) {
       }
     } catch (err) {
       setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST. CHECK SERVER.", is_ai: true }]);
+      console.error("Chat Error:", err);
     }
     setLoading(false);
   };
