@@ -5,7 +5,8 @@ import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import './Main.css';
 
 // FIX: Hardcoded Domain to guarantee connection
-const API_BASE_URL = "https://careco-pilotai.com"; 
+// FIX: Hardcoded to the LIVE Render Backend
+const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; 
 
 function Login({ onLogin, onBack }) {
   const [isRegistering, setIsRegistering] = useState(false);
