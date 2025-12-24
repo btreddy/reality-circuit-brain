@@ -381,3 +381,52 @@ ul, ol {
 li {
   margin-bottom: 5px;
 }
+/* --- MOBILE RESPONSIVENESS (THE STACK FIX) --- */
+@media (max-width: 768px) {
+  
+  /* 1. FORCE VERTICAL STACKING (Fixes the Icon vs Text issue) */
+  .services-grid {
+    display: flex;
+    flex-direction: column; /* Stacks items Top-to-Bottom */
+    width: 100%;
+    padding: 15px;
+    box-sizing: border-box;
+  }
+
+  .service-card {
+    width: 100%; /* Card takes full width */
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column; /* Icon on Top, Text Below */
+    align-items: center;    /* Center everything */
+    text-align: center;
+  }
+
+  /* 2. MAKE TEXT READABLE (No Zooming needed) */
+  .hero-desc, .service-card p {
+    font-size: 1.1rem; /* Big, clear text */
+    line-height: 1.5;
+  }
+
+  /* 3. LANDING PAGE WIDTH FIX */
+  .landing-container, body {
+    width: 100%;
+    overflow-x: hidden; /* Prevent side-scrolling */
+  }
+
+  /* 4. THE SATELLITE BUTTON (Positioned for Mobile) */
+  .command-stack {
+    position: fixed; /* Floats over the content */
+    bottom: 25px;    /* 25px from the bottom edge */
+    right: 20px;     /* 20px from the right edge */
+    z-index: 9999;   /* Always on top */
+  }
+
+  /* Make the button slightly bigger & pulse more on mobile */
+  .stack-main-btn {
+    width: 65px;
+    height: 65px;
+    background: rgba(0, 0, 0, 0.9); /* Dark background to stand out */
+    box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); /* Bright Glow */
+  }
+}
