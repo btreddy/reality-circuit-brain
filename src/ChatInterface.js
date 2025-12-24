@@ -9,7 +9,9 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null); 
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -23,23 +25,40 @@ function ChatInterface({ roomId, username, onLeave }) {
       .catch(err => console.error("History Error:", err));
   }, [roomId]);
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result.split(',')[1]); 
+        setInputText(`[📎 ATTACHED: ${file.name}] `); 
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const sendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && !selectedImage) return;
+
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
     setLoading(true);
-    const originalText = inputText;
+    
+    const payload = {
+      room_id: roomId,
+      sender_name: username,
+      message: inputText,
+      image: selectedImage
+    };
+
     setInputText(''); 
+    setSelectedImage(null);
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          room_id: roomId,
-          sender_name: username,
-          message: originalText
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.error) {
@@ -80,25 +99,36 @@ function ChatInterface({ roomId, username, onLeave }) {
     } catch (err) { alert("NUKE FAILED: " + err.message); }
   };
 
-  // --- NEW: SMART TEXT FORMATTER ---
-  // Converts markdown symbols (**bold**, * list) into clean HTML
+  // --- IMPROVED FORMATTER: Handles Bold (**text**) AND Bullets ---
+  const formatLine = (text) => {
+    // 1. Split by double stars (**)
+    const parts = text.split(/(\*\*.*?\*\*)/g); 
+    return parts.map((part, index) => {
+      // 2. Check if part is bold wrapped
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // Return bold element without stars
+        return <strong key={index}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
   const formatMessage = (text) => {
     if (!text) return "";
     
-    // 1. Handle Bullet Points (lines starting with * )
-    let formatted = text.split('\n').map((line, i) => {
+    // Split into lines
+    return <div>{text.split('\n').map((line, i) => {
+      // Clean up the line for bullet points
       if (line.trim().startsWith('* ')) {
-        return <li key={i}>{line.replace('* ', '')}</li>;
+        const cleanLine = line.replace('* ', ''); 
+        return <li key={i}>{formatLine(cleanLine)}</li>; // Apply formatting inside list item
       }
-      return <div key={i}>{line}</div>;
-    });
-
-    return <div>{formatted}</div>;
+      return <div key={i}>{formatLine(line)}</div>; // Apply formatting to normal line
+    })}</div>;
   };
 
   return (
     <div className="chat-container">
-      {/* --- HEADER --- */}
       <header className="chat-header">
         <div>
           <h1>WAR ROOM: {roomId}</h1>
@@ -111,7 +141,6 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
       </header>
 
-      {/* --- CHAT WINDOW --- */}
       <div className="chat-window">
         {messages.length === 0 && (
             <div style={{textAlign: 'center', marginTop: '50px', color: '#005500'}}>
@@ -121,17 +150,13 @@ function ChatInterface({ roomId, username, onLeave }) {
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
             <span className="sender-label">{msg.sender_name}</span>
-            {/* USE THE NEW FORMATTER HERE */}
-            <div className="message-content">
-              {formatMessage(msg.message)}
-            </div>
+            <div className="message-content">{formatMessage(msg.message)}</div>
           </div>
         ))}
         {loading && <div className="message-box ai">... ANALYZING DATA STREAM ...</div>}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* --- INPUT AREA --- */}
       <div className="input-area">
         <div className="quick-actions">
           <button className="action-btn" onClick={() => handleQuickAction('IDEAS')}>💡 IDEAS</button>
@@ -140,7 +165,8 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
 
         <div className="input-wrapper">
-          <button className="attach-btn">📎</button>
+          <input type="file" ref={fileInputRef} style={{display: 'none'}} onChange={handleFileSelect} accept="image/*" />
+          <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
           <input 
             className="chat-input" 
             value={inputText}
