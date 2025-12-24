@@ -1,0 +1,9 @@
+{
+  "short_name": "Reality Circuit",
+  "name": "Reality Circuit AI War Room",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#000000"
+}
