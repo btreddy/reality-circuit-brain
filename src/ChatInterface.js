@@ -68,20 +68,32 @@ function ChatInterface({ roomId, username, onLeave }) {
     setTimeout(() => setCopyStatus(''), 3000);
   };
 
-  // --- NEW FUNCTION: NUKE DATA ---
   const handleNuke = async () => {
     if (!window.confirm("⚠️ WARNING: This will permanently delete all chat history for this room. Confirm?")) return;
-    
     try {
       await fetch(`${API_BASE_URL}/api/chat/nuke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ room_id: roomId })
       });
-      setMessages([]); // Clear screen instantly
-    } catch (err) {
-      alert("NUKE FAILED: " + err.message);
-    }
+      setMessages([]); 
+    } catch (err) { alert("NUKE FAILED: " + err.message); }
+  };
+
+  // --- NEW: SMART TEXT FORMATTER ---
+  // Converts markdown symbols (**bold**, * list) into clean HTML
+  const formatMessage = (text) => {
+    if (!text) return "";
+    
+    // 1. Handle Bullet Points (lines starting with * )
+    let formatted = text.split('\n').map((line, i) => {
+      if (line.trim().startsWith('* ')) {
+        return <li key={i}>{line.replace('* ', '')}</li>;
+      }
+      return <div key={i}>{line}</div>;
+    });
+
+    return <div>{formatted}</div>;
   };
 
   return (
@@ -93,15 +105,8 @@ function ChatInterface({ roomId, username, onLeave }) {
           <span className="online-status">OPERATIVE: {username}</span>
         </div>
         <div className="header-controls">
-          <button className="control-btn" onClick={copyInviteLink} title="Invite Team">
-            {copyStatus || "🔗 INVITE"}
-          </button>
-          
-          {/* NUKE BUTTON RESTORED */}
-          <button className="control-btn" onClick={handleNuke} title="Wipe Data (Nuke)">
-            ☢️
-          </button>
-          
+          <button className="control-btn" onClick={copyInviteLink} title="Invite Team">{copyStatus || "🔗 INVITE"}</button>
+          <button className="control-btn" onClick={handleNuke} title="Wipe Data (Nuke)">☢️</button>
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
       </header>
@@ -116,7 +121,10 @@ function ChatInterface({ roomId, username, onLeave }) {
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
             <span className="sender-label">{msg.sender_name}</span>
-            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
+            {/* USE THE NEW FORMATTER HERE */}
+            <div className="message-content">
+              {formatMessage(msg.message)}
+            </div>
           </div>
         ))}
         {loading && <div className="message-box ai">... ANALYZING DATA STREAM ...</div>}

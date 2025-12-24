@@ -277,4 +277,35 @@ body {
 @media (max-width: 768px) {
   .command-stack { right: 10px; bottom: 15px; }
   .stack-btn, .stack-main-btn { width: 45px; height: 45px; }
+}/* --- SCROLLBAR CUSTOMIZATION (Webkit Browsers) --- */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #000; 
+  border-left: 1px solid #003300;
+}
+::-webkit-scrollbar-thumb {
+  background: #005500; 
+  border: 1px solid #00ff41;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff41; 
+}
+
+/* --- TEXT FORMATTING FIX --- */
+/* Make bold text actually bold and green */
+strong {
+  color: #fff; /* Highlight bold text in white for contrast */
+  font-weight: bold;
+  text-shadow: 0 0 5px #ffffff;
+}
+
+/* Add spacing to lists */
+ul, ol {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+li {
+  margin-bottom: 5px;
 }
