@@ -228,69 +228,141 @@ body {
 .toggle-link:hover { color: #00ff41; }
 .error-msg { color: #ffaa00; border: 1px dashed #ffaa00; padding: 10px; margin-bottom: 20px; font-size: 0.9rem; }
 
-/* --- 4. COMMAND STACK (THE ICONS) --- */
+/* --- 4. COMMAND STACK (THE SATELLITE BUTTON) --- */
+
+/* The Radar Pulse Animation */
+@keyframes signal-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.7); }
+  70% { box-shadow: 0 0 0 20px rgba(0, 255, 65, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0); }
+}
+
 .command-stack {
   position: fixed;
-  bottom: 25px;
-  right: 25px;
+  bottom: 30px; /* Moved up for better visibility */
+  right: 30px;  /* Moved in so it doesn't touch the edge */
   z-index: 2000;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column-reverse; /* Options expand upwards */
   align-items: center;
   gap: 15px;
 }
+
 .stack-main-btn {
-  width: 60px; height: 60px; border-radius: 50%;
-  background: #000; border: 2px solid #00ff41;
-  color: #00ff41; font-size: 1.8rem;
-  cursor: pointer; box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
-  display: flex; justify-content: center; align-items: center;
-  transition: all 0.3s;
-}
-.stack-main-btn:hover { transform: scale(1.1); box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); }
-.stack-main-btn.active { background: #00ff41; color: #000; transform: rotate(90deg); }
-
-.stack-options {
-  display: flex; flex-direction: column; gap: 15px;
-  opacity: 0; transform: translateY(20px);
-  pointer-events: none; transition: all 0.3s ease;
-}
-.stack-options.visible { opacity: 1; transform: translateY(0); pointer-events: all; }
-
-.stack-btn {
-  width: 50px; height: 50px; border-radius: 50%;
-  background: #000; border: 1px solid #00ff41;
-  display: flex; justify-content: center; align-items: center;
-  font-size: 1.4rem; text-decoration: none; position: relative; transition: 0.2s;
-}
-.stack-btn:hover { background: #002200; transform: scale(1.1); }
-.wa-btn { color: #25D366; border-color: #25D366; }
-.call-btn { color: #00ff41; }
-.tooltip {
-  position: absolute; right: 60px; background: #000; color: #00ff41;
-  padding: 5px 10px; border: 1px solid #00ff41; border-radius: 4px;
-  font-size: 0.8rem; white-space: nowrap; opacity: 0; pointer-events: none;
-}
-.stack-btn:hover .tooltip { opacity: 1; right: 70px; }
-
-/* Mobile Adjustments */
-@media (max-width: 768px) {
-  .command-stack { right: 10px; bottom: 15px; }
-  .stack-btn, .stack-main-btn { width: 45px; height: 45px; }
-}/* --- SCROLLBAR CUSTOMIZATION (Webkit Browsers) --- */
-::-webkit-scrollbar {
-  width: 10px;
-}
-::-webkit-scrollbar-track {
+  width: 65px; 
+  height: 65px; 
+  border-radius: 50%;
   background: #000; 
-  border-left: 1px solid #003300;
+  border: 2px solid #00ff41;
+  color: #00ff41; 
+  font-size: 1.8rem;
+  cursor: pointer; 
+  
+  /* The "Tempting" Animation */
+  animation: signal-pulse 2s infinite;
+  
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy effect */
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
 }
-::-webkit-scrollbar-thumb {
-  background: #005500; 
-  border: 1px solid #00ff41;
+
+.stack-main-btn:hover { 
+  transform: scale(1.1); 
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.8); 
 }
-::-webkit-scrollbar-thumb:hover {
+
+/* When clicked (Active State) */
+.stack-main-btn.active { 
   background: #00ff41; 
+  color: #000; 
+  transform: rotate(45deg); /* Turns the 'Sat' icon into an 'X' close button */
+  animation: none; /* Stop pulsing when open */
+}
+
+/* The Hidden Options (Chat, Call, etc.) */
+.stack-options {
+  display: flex; 
+  flex-direction: column; 
+  gap: 15px;
+  opacity: 0; 
+  transform: translateY(20px);
+  pointer-events: none; 
+  transition: all 0.3s ease;
+}
+
+.stack-options.visible { 
+  opacity: 1; 
+  transform: translateY(0); 
+  pointer-events: all; 
+}
+
+/* Individual Option Buttons */
+.stack-btn {
+  width: 55px; 
+  height: 55px; 
+  border-radius: 50%;
+  background: #001100; 
+  border: 1px solid #00ff41;
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+  font-size: 1.4rem; 
+  text-decoration: none; 
+  position: relative; 
+  transition: 0.2s;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.stack-btn:hover { 
+  background: #00ff41; 
+  color: #000; 
+  transform: scale(1.1) translateX(-5px); /* Pops out slightly */
+}
+
+/* Tooltips (Labels like 'WhatsApp', 'Call') */
+.tooltip {
+  position: absolute; 
+  right: 70px; 
+  background: rgba(0, 20, 0, 0.9); 
+  color: #00ff41;
+  padding: 5px 12px; 
+  border: 1px solid #00ff41; 
+  border-radius: 4px;
+  font-size: 0.9rem; 
+  white-space: nowrap; 
+  opacity: 0; 
+  pointer-events: none;
+  transition: 0.2s;
+  transform: translateX(10px);
+}
+
+.stack-btn:hover .tooltip { 
+  opacity: 1; 
+  transform: translateX(0); 
+  right: 65px;
+}
+
+/* --- MOBILE SPECIFIC TUNING --- */
+@media (max-width: 768px) {
+  .command-stack { 
+    right: 20px;   /* Safe distance from right edge */
+    bottom: 25px;  /* Safe distance from bottom thumb zone */
+  }
+  
+  .stack-main-btn { 
+    width: 60px; 
+    height: 60px; 
+    font-size: 1.5rem;
+  }
+  
+  /* On mobile, show tooltips by default when menu is open (optional) */
+  .stack-options.visible .tooltip {
+    opacity: 1;
+    right: 60px;
+    transform: translateX(0);
+  }
 }
 
 /* --- TEXT FORMATTING FIX --- */

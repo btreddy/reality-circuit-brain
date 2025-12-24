@@ -9,9 +9,9 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
-  const [selectedImage, setSelectedImage] = useState(null); // New State for File
+  const [selectedImage, setSelectedImage] = useState(null); 
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null); // Reference to hidden file input
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -25,15 +25,13 @@ function ChatInterface({ roomId, username, onLeave }) {
       .catch(err => console.error("History Error:", err));
   }, [roomId]);
 
-  // --- NEW: HANDLE FILE SELECTION ---
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // We save the Base64 string to send to the server
-        setSelectedImage(reader.result.split(',')[1]); // Remove the "data:image..." prefix
-        setInputText(`[📎 ATTACHED: ${file.name}] `); // Show user a file is ready
+        setSelectedImage(reader.result.split(',')[1]); 
+        setInputText(`[📎 ATTACHED: ${file.name}] `); 
       };
       reader.readAsDataURL(file);
     }
@@ -42,7 +40,6 @@ function ChatInterface({ roomId, username, onLeave }) {
   const sendMessage = async () => {
     if (!inputText.trim() && !selectedImage) return;
 
-    // Optimistic UI
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
     setLoading(true);
@@ -51,10 +48,9 @@ function ChatInterface({ roomId, username, onLeave }) {
       room_id: roomId,
       sender_name: username,
       message: inputText,
-      image: selectedImage // Send the image data
+      image: selectedImage
     };
 
-    // Reset Input
     setInputText(''); 
     setSelectedImage(null);
 
@@ -103,15 +99,32 @@ function ChatInterface({ roomId, username, onLeave }) {
     } catch (err) { alert("NUKE FAILED: " + err.message); }
   };
 
+  // --- IMPROVED FORMATTER: Handles Bold (**text**) AND Bullets ---
+  const formatLine = (text) => {
+    // 1. Split by double stars (**)
+    const parts = text.split(/(\*\*.*?\*\*)/g); 
+    return parts.map((part, index) => {
+      // 2. Check if part is bold wrapped
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // Return bold element without stars
+        return <strong key={index}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  };
+
   const formatMessage = (text) => {
     if (!text) return "";
-    let formatted = text.split('\n').map((line, i) => {
+    
+    // Split into lines
+    return <div>{text.split('\n').map((line, i) => {
+      // Clean up the line for bullet points
       if (line.trim().startsWith('* ')) {
-        return <li key={i}>{line.replace('* ', '')}</li>;
+        const cleanLine = line.replace('* ', ''); 
+        return <li key={i}>{formatLine(cleanLine)}</li>; // Apply formatting inside list item
       }
-      return <div key={i}>{line}</div>;
-    });
-    return <div>{formatted}</div>;
+      return <div key={i}>{formatLine(line)}</div>; // Apply formatting to normal line
+    })}</div>;
   };
 
   return (
@@ -152,20 +165,8 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
 
         <div className="input-wrapper">
-          {/* HIDDEN FILE INPUT */}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            style={{display: 'none'}} 
-            onChange={handleFileSelect} 
-            accept="image/*" // Restrict to images for now
-          />
-          
-          {/* PAPERCLIP BUTTON TRIGGERS INPUT */}
-          <button className="attach-btn" onClick={() => fileInputRef.current.click()}>
-            📎
-          </button>
-          
+          <input type="file" ref={fileInputRef} style={{display: 'none'}} onChange={handleFileSelect} accept="image/*" />
+          <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
           <input 
             className="chat-input" 
             value={inputText}
