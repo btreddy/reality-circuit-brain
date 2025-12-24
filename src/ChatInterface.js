@@ -99,14 +99,43 @@ function ChatInterface({ roomId, username, onLeave }) {
     } catch (err) { alert("NUKE FAILED: " + err.message); }
   };
 
-  // --- IMPROVED FORMATTER: Handles Bold (**text**) AND Bullets ---
+  // --- NEW: SAVE SESSION (DOWNLOAD TRANSCRIPT) ---
+  const handleSaveSession = () => {
+    if (messages.length === 0) {
+      alert("NO INTELLIGENCE DATA TO SAVE.");
+      return;
+    }
+
+    const timestamp = new Date().toLocaleString();
+    let content = `REALITY CIRCUIT - STRATEGIC LOG\n`;
+    content += `DATE: ${timestamp}\n`;
+    content += `ROOM: ${roomId}\n`;
+    content += `OPERATIVE: ${username}\n`;
+    content += `----------------------------------------\n\n`;
+
+    messages.forEach(msg => {
+      const role = msg.sender_name.toUpperCase();
+      // Clean up markdown stars for the text file
+      const cleanMsg = msg.message.replace(/\*\*/g, "").replace(/^\* /gm, "• ");
+      content += `[${role}]:\n${cleanMsg}\n\n`;
+    });
+
+    // Create and trigger download
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MISSION_LOG_${roomId}_${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const formatLine = (text) => {
-    // 1. Split by double stars (**)
     const parts = text.split(/(\*\*.*?\*\*)/g); 
     return parts.map((part, index) => {
-      // 2. Check if part is bold wrapped
       if (part.startsWith('**') && part.endsWith('**')) {
-        // Return bold element without stars
         return <strong key={index}>{part.slice(2, -2)}</strong>;
       }
       return part;
@@ -115,15 +144,12 @@ function ChatInterface({ roomId, username, onLeave }) {
 
   const formatMessage = (text) => {
     if (!text) return "";
-    
-    // Split into lines
     return <div>{text.split('\n').map((line, i) => {
-      // Clean up the line for bullet points
       if (line.trim().startsWith('* ')) {
         const cleanLine = line.replace('* ', ''); 
-        return <li key={i}>{formatLine(cleanLine)}</li>; // Apply formatting inside list item
+        return <li key={i}>{formatLine(cleanLine)}</li>;
       }
-      return <div key={i}>{formatLine(line)}</div>; // Apply formatting to normal line
+      return <div key={i}>{formatLine(line)}</div>;
     })}</div>;
   };
 
@@ -136,6 +162,10 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
         <div className="header-controls">
           <button className="control-btn" onClick={copyInviteLink} title="Invite Team">{copyStatus || "🔗 INVITE"}</button>
+          
+          {/* SAVE BUTTON ACTIVATED */}
+          <button className="control-btn" onClick={handleSaveSession} title="Save Transcript">💾</button>
+          
           <button className="control-btn" onClick={handleNuke} title="Wipe Data (Nuke)">☢️</button>
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
