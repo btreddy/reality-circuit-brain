@@ -4,6 +4,9 @@ from psycopg2.extras import RealDictCursor
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import google.generativeai as genai
+import base64
+from io import BytesIO
+from PIL import Image  # You might need to add 'Pillow' to requirements.txt later
 
 # --- CONFIGURATION ---
 app = Flask(__name__, static_folder='build', static_url_path='/')
@@ -69,21 +72,23 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# --- AI GENERATION CORE ---
-def generate_smart_content(prompt_text):
+def generate_smart_content(prompt_text, image_data=None):
     try:
-        # Try the newest model first
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        response = model.generate_content(prompt_text)
-        return response.text.strip()
-    except:
-        try:
-            # Fallback to standard model
-            model = genai.GenerativeModel('gemini-1.5-flash')
+
+        if image_data:
+            # Convert base64 string to Image
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(BytesIO(image_bytes))
+            # Send Text + Image to AI
+            response = model.generate_content([prompt_text, image])
+        else:
+            # Text only
             response = model.generate_content(prompt_text)
-            return response.text.strip()
-        except Exception as e:
-            return "System Malfunction: AI Core Unresponsive. (Check API Key)"
+
+        return response.text.strip()
+    except Exception as e:
+        return f"AI VISUAL SYSTEM ERROR: {str(e)}"
 
 # --- MANUAL CORS FIX (Extra Safety) ---
 @app.after_request
@@ -156,27 +161,32 @@ def send_chat():
     room_id = data.get('room_id')
     sender_name = data.get('sender_name')
     message = data.get('message', '')
+    image_data = data.get('image', None) # New Field
+
+    # ... (Keep your existing VIP/Limit logic here if you want) ...
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # 1. Save User Message
+    # If there is an image, we append a [IMAGE UPLOADED] tag to the text for history
+    display_message = message
+    if image_data:
+        display_message += " \n[📎 IMAGE ATTACHED]"
+
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
-                (room_id, sender_name, message, False))
+                (room_id, sender_name, display_message, False))
     conn.commit()
-    
-    # 2. Generate REAL AI Response
-    # We add a system prompt so it knows who it is
-    system_prompt = f"You are Reality Circuit, a strategic business AI. Keep answers concise, professional, and tactical. The user asks: {message}"
-    ai_reply = generate_smart_content(system_prompt)
+
+    # 2. Generate AI Reply (With Image if present)
+    ai_reply = generate_smart_content(message, image_data)
 
     # 3. Save AI Reply
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, "Reality Circuit", ai_reply, True))
     conn.commit()
-    cur.close()
-    conn.close()
-    
+    cur.close(); conn.close()
+
     return jsonify({"ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
