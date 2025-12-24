@@ -8,7 +8,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [copyStatus, setCopyStatus] = useState(''); // State for copy feedback
+  const [copyStatus, setCopyStatus] = useState('');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -61,14 +61,27 @@ function ChatInterface({ roomId, username, onLeave }) {
     setInputText(prompt);
   };
 
-  // --- NEW FUNCTION: GENERATE INVITE LINK ---
   const copyInviteLink = () => {
-    // Creates a link like: https://careco-pilotai.com/?join=btr
     const link = `${window.location.origin}/?join=${roomId}`;
     navigator.clipboard.writeText(link);
+    setCopyStatus('LINK COPIED!');
+    setTimeout(() => setCopyStatus(''), 3000);
+  };
+
+  // --- NEW FUNCTION: NUKE DATA ---
+  const handleNuke = async () => {
+    if (!window.confirm("⚠️ WARNING: This will permanently delete all chat history for this room. Confirm?")) return;
     
-    setCopyStatus('LINK COPIED! SHARE IT.');
-    setTimeout(() => setCopyStatus(''), 3000); // Clear message after 3 seconds
+    try {
+      await fetch(`${API_BASE_URL}/api/chat/nuke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId })
+      });
+      setMessages([]); // Clear screen instantly
+    } catch (err) {
+      alert("NUKE FAILED: " + err.message);
+    }
   };
 
   return (
@@ -80,17 +93,26 @@ function ChatInterface({ roomId, username, onLeave }) {
           <span className="online-status">OPERATIVE: {username}</span>
         </div>
         <div className="header-controls">
-          {/* INVITE BUTTON */}
           <button className="control-btn" onClick={copyInviteLink} title="Invite Team">
             {copyStatus || "🔗 INVITE"}
           </button>
-          <button className="control-btn" title="Save Session">💾</button>
+          
+          {/* NUKE BUTTON RESTORED */}
+          <button className="control-btn" onClick={handleNuke} title="Wipe Data (Nuke)">
+            ☢️
+          </button>
+          
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
       </header>
 
       {/* --- CHAT WINDOW --- */}
       <div className="chat-window">
+        {messages.length === 0 && (
+            <div style={{textAlign: 'center', marginTop: '50px', color: '#005500'}}>
+                [ SYSTEM CLEAN. NO ACTIVE DATA. ]
+            </div>
+        )}
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
             <span className="sender-label">{msg.sender_name}</span>

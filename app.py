@@ -216,6 +216,22 @@ def serve(path):
         else:
             return "⚠️ SYSTEM LOADING... (Frontend building)", 200
 
+@app.route('/api/chat/nuke', methods=['POST'])
+def nuke_chat():
+    data = request.json
+    room_id = data.get('room_id')
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # DELETE all messages for this room
+        cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "CLEARED"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 if __name__ == '__main__':
     with app.app_context():
         init_db()
