@@ -16,13 +16,35 @@ function ChatInterface({ roomId, username, onLeave }) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  
+  // Scroll only when new messages arrive (and user is near bottom)
+  useEffect(() => { scrollToBottom(); }, [messages.length]);
 
+  // --- NEW: RADAR SWEEP (AUTO-REFRESH EVERY 3 SECONDS) ---
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`)
-      .then(res => res.json())
-      .then(data => setMessages(data))
-      .catch(err => console.error("History Error:", err));
+    const fetchHistory = () => {
+      fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`)
+        .then(res => res.json())
+        .then(data => {
+          // Only update if we have new data to avoid flickering
+          setMessages(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(data)) {
+              return data;
+            }
+            return prev;
+          });
+        })
+        .catch(err => console.error("Radar Error:", err));
+    };
+
+    // 1. Fetch immediately on load
+    fetchHistory();
+
+    // 2. Set up the Radar Sweep (every 3000ms = 3 seconds)
+    const interval = setInterval(fetchHistory, 3000);
+
+    // 3. Cleanup when leaving
+    return () => clearInterval(interval);
   }, [roomId]);
 
   const handleFileSelect = (e) => {
@@ -40,10 +62,12 @@ function ChatInterface({ roomId, username, onLeave }) {
   const sendMessage = async () => {
     if (!inputText.trim() && !selectedImage) return;
 
+    // Optimistic UI Update (Shows your msg instantly)
+    // Note: The next Radar Sweep will overwrite this with the confirmed data from server
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
-    setLoading(true);
     
+    setLoading(true);
     const payload = {
       room_id: roomId,
       sender_name: username,
@@ -55,19 +79,15 @@ function ChatInterface({ roomId, username, onLeave }) {
     setSelectedImage(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
+      await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.error) {
-         setMessages(prev => [...prev, { sender_name: "SYSTEM", message: `⚠️ ${data.error}`, is_ai: true }]);
-      } else {
-         setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
-      }
+      // We don't need to manually handle the response here because 
+      // the Radar Sweep (useEffect) will pick up the AI reply automatically in 3 seconds.
     } catch (err) {
-      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST. CHECK SERVER.", is_ai: true }]);
+      setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST.", is_ai: true }]);
     }
     setLoading(false);
   };
@@ -87,40 +107,14 @@ function ChatInterface({ roomId, username, onLeave }) {
     setTimeout(() => setCopyStatus(''), 3000);
   };
 
-  const handleNuke = async () => {
-    if (!window.confirm("⚠️ WARNING: This will permanently delete all chat history for this room. Confirm?")) return;
-    try {
-      await fetch(`${API_BASE_URL}/api/chat/nuke`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_id: roomId })
-      });
-      setMessages([]); 
-    } catch (err) { alert("NUKE FAILED: " + err.message); }
-  };
-
-  // --- NEW: SAVE SESSION (DOWNLOAD TRANSCRIPT) ---
   const handleSaveSession = () => {
-    if (messages.length === 0) {
-      alert("NO INTELLIGENCE DATA TO SAVE.");
-      return;
-    }
-
+    if (messages.length === 0) { alert("NO DATA TO SAVE."); return; }
     const timestamp = new Date().toLocaleString();
-    let content = `REALITY CIRCUIT - STRATEGIC LOG\n`;
-    content += `DATE: ${timestamp}\n`;
-    content += `ROOM: ${roomId}\n`;
-    content += `OPERATIVE: ${username}\n`;
-    content += `----------------------------------------\n\n`;
-
+    let content = `REALITY CIRCUIT - MISSION LOG\nDATE: ${timestamp}\nROOM: ${roomId}\n-------------------\n\n`;
     messages.forEach(msg => {
-      const role = msg.sender_name.toUpperCase();
-      // Clean up markdown stars for the text file
       const cleanMsg = msg.message.replace(/\*\*/g, "").replace(/^\* /gm, "• ");
-      content += `[${role}]:\n${cleanMsg}\n\n`;
+      content += `[${msg.sender_name}]:\n${cleanMsg}\n\n`;
     });
-
-    // Create and trigger download
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -129,7 +123,18 @@ function ChatInterface({ roomId, username, onLeave }) {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  };
+
+  const handleNuke = async () => {
+    if (!window.confirm("⚠️ WARNING: DELETE ALL HISTORY?")) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/chat/nuke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId })
+      });
+      setMessages([]); 
+    } catch (err) { alert("NUKE FAILED: " + err.message); }
   };
 
   const formatLine = (text) => {
@@ -162,28 +167,19 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
         <div className="header-controls">
           <button className="control-btn" onClick={copyInviteLink} title="Invite Team">{copyStatus || "🔗 INVITE"}</button>
-          
-          {/* SAVE BUTTON ACTIVATED */}
           <button className="control-btn" onClick={handleSaveSession} title="Save Transcript">💾</button>
-          
-          <button className="control-btn" onClick={handleNuke} title="Wipe Data (Nuke)">☢️</button>
+          <button className="control-btn" onClick={handleNuke} title="Wipe Data">☢️</button>
           <button className="control-btn danger-btn" onClick={onLeave}>🔴 EXIT</button>
         </div>
       </header>
 
       <div className="chat-window">
-        {messages.length === 0 && (
-            <div style={{textAlign: 'center', marginTop: '50px', color: '#005500'}}>
-                [ SYSTEM CLEAN. NO ACTIVE DATA. ]
-            </div>
-        )}
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
             <span className="sender-label">{msg.sender_name}</span>
             <div className="message-content">{formatMessage(msg.message)}</div>
           </div>
         ))}
-        {loading && <div className="message-box ai">... ANALYZING DATA STREAM ...</div>}
         <div ref={messagesEndRef} />
       </div>
 
