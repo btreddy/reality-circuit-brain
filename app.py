@@ -7,6 +7,9 @@ import google.generativeai as genai
 import base64
 from io import BytesIO
 from PIL import Image
+# NEW IMPORTS FOR DOCS
+from pypdf import PdfReader
+from docx import Document
 
 # --- CONFIGURATION ---
 app = Flask(__name__, static_folder='build', static_url_path='/')
@@ -40,19 +43,42 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-def generate_smart_content(prompt_text, image_data=None):
+def generate_smart_content(prompt_text, file_data=None, file_type=None):
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        if image_data:
-            image_bytes = base64.b64decode(image_data)
-            image = Image.open(BytesIO(image_bytes))
-            response = model.generate_content([prompt_text, image])
-        else:
-            response = model.generate_content(prompt_text)
+        content_parts = [prompt_text]
+
+        if file_data and file_type:
+            file_bytes = base64.b64decode(file_data)
+            file_stream = BytesIO(file_bytes)
+
+            if "image" in file_type:
+                # Handle Images (Vision)
+                image = Image.open(file_stream)
+                content_parts.append(image)
+
+            elif "pdf" in file_type:
+                # Handle PDF (Extract Text)
+                try:
+                    reader = PdfReader(file_stream)
+                    pdf_text = "\n".join([page.extract_text() for page in reader.pages])
+                    content_parts.append(f"\n[DOCUMENT CONTENT]:\n{pdf_text}")
+                except:
+                    return "ERROR: Could not read PDF file."
+
+            elif "word" in file_type or "officedocument" in file_type:
+                # Handle Word Docs (Extract Text)
+                try:
+                    doc = Document(file_stream)
+                    doc_text = "\n".join([para.text for para in doc.paragraphs])
+                    content_parts.append(f"\n[DOCUMENT CONTENT]:\n{doc_text}")
+                except:
+                    return "ERROR: Could not read Word file."
+
+        response = model.generate_content(content_parts)
         return response.text.strip()
     except Exception as e:
-        return f"AI ERROR: {str(e)}"
-
+        return f"AI ANALYST ERROR: {str(e)}"
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -120,34 +146,34 @@ def send_chat():
     room_id = data.get('room_id')
     sender_name = data.get('sender_name')
     message = data.get('message', '')
-    image_data = data.get('image', None)
+    file_data = data.get('file_data', None) # Renamed from image
+    file_type = data.get('file_type', None) # New field
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
+
     # 1. Save User Message
     display_message = message
-    if image_data:
-        display_message += " \n[📎 IMAGE ATTACHED]"
+    if file_data:
+        display_message += f" \n[📎 ATTACHMENT: {file_type.split('/')[-1] if file_type else 'FILE'}]"
 
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, sender_name, display_message, False))
     conn.commit()
-    
-    # 2. SMART AI CHECK (@AI or Image trigger)
-    should_reply = "@ai" in message.lower() or image_data is not None
+
+    # 2. SMART AI CHECK (@AI or File trigger)
+    should_reply = "@ai" in message.lower() or file_data is not None
     ai_reply = None
-    
+
     if should_reply:
         clean_prompt = message.replace("@ai", "").replace("@AI", "").strip()
-        ai_reply = generate_smart_content(clean_prompt, image_data)
+        # Pass the file data AND type to the generator
+        ai_reply = generate_smart_content(clean_prompt, file_data, file_type)
 
         cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                     (room_id, "Reality Circuit", ai_reply, True))
         conn.commit()
-
     cur.close(); conn.close()
-    
     return jsonify({"status": "SENT", "ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])

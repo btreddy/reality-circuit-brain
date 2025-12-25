@@ -9,7 +9,10 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
-  const [selectedImage, setSelectedImage] = useState(null); 
+  
+  // CHANGED: Now stores an object { data, type, name } instead of just a string
+  const [selectedFile, setSelectedFile] = useState(null); 
+  
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -40,20 +43,27 @@ function ChatInterface({ roomId, username, onLeave }) {
     return () => clearInterval(interval);
   }, [roomId]);
 
+  // --- 1. UPDATED FILE HANDLER (Supports PDF/DOCS) ---
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImage(reader.result.split(',')[1]); 
-        setInputText(`[📎 ATTACHED: ${file.name}] `); 
+        // Store file data, type, and name
+        setSelectedFile({ 
+            data: reader.result.split(',')[1], 
+            type: file.type || 'application/octet-stream',
+            name: file.name
+        }); 
+        setInputText(`[📎 READY: ${file.name}] `); 
       };
       reader.readAsDataURL(file);
     }
   };
 
+  // --- 2. UPDATED SEND LOGIC (Sends File Type) ---
   const sendMessage = async () => {
-    if (!inputText.trim() && !selectedImage) return;
+    if (!inputText.trim() && !selectedFile) return;
 
     // Optimistic UI Update
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
@@ -64,11 +74,12 @@ function ChatInterface({ roomId, username, onLeave }) {
       room_id: roomId,
       sender_name: username,
       message: inputText,
-      image: selectedImage
+      file_data: selectedFile ? selectedFile.data : null, // Send the base64 data
+      file_type: selectedFile ? selectedFile.type : null  // Send the MIME type (pdf/image/word)
     };
 
     setInputText(''); 
-    setSelectedImage(null);
+    setSelectedFile(null); // Clear file after sending
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
@@ -81,7 +92,6 @@ function ChatInterface({ roomId, username, onLeave }) {
       if (data.error) {
          setMessages(prev => [...prev, { sender_name: "SYSTEM", message: `⚠️ ${data.error}`, is_ai: true }]);
       } else if (data.ai_reply) {
-         // ONLY add the message if the AI actually replied (@AI Triggered)
          setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
       }
       
@@ -92,7 +102,6 @@ function ChatInterface({ roomId, username, onLeave }) {
   };
 
   const handleQuickAction = (action) => {
-    // Quick Actions automatically add @AI so they always work
     let prompt = "";
     if (action === "IDEAS") prompt = "@AI Brainstorm 3 innovative ideas for this project.";
     if (action === "RISKS") prompt = "@AI Analyze potential risks and pitfalls.";
@@ -191,8 +200,17 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
 
         <div className="input-wrapper">
-          <input type="file" ref={fileInputRef} style={{display: 'none'}} onChange={handleFileSelect} accept="image/*" />
+          {/* --- 3. UPDATED INPUT TAG (Supports PDF, DOC, IMAGES) --- */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            style={{display: 'none'}} 
+            onChange={handleFileSelect} 
+            accept="image/*,.pdf,.doc,.docx" 
+          />
+          
           <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
+          
           <input 
             className="chat-input" 
             value={inputText}
