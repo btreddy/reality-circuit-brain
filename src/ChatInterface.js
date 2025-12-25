@@ -17,16 +17,14 @@ function ChatInterface({ roomId, username, onLeave }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   
-  // Scroll only when new messages arrive (and user is near bottom)
   useEffect(() => { scrollToBottom(); }, [messages.length]);
 
-  // --- NEW: RADAR SWEEP (AUTO-REFRESH EVERY 3 SECONDS) ---
+  // RADAR SWEEP (AUTO-REFRESH)
   useEffect(() => {
     const fetchHistory = () => {
       fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`)
         .then(res => res.json())
         .then(data => {
-          // Only update if we have new data to avoid flickering
           setMessages(prev => {
             if (JSON.stringify(prev) !== JSON.stringify(data)) {
               return data;
@@ -37,13 +35,8 @@ function ChatInterface({ roomId, username, onLeave }) {
         .catch(err => console.error("Radar Error:", err));
     };
 
-    // 1. Fetch immediately on load
     fetchHistory();
-
-    // 2. Set up the Radar Sweep (every 3000ms = 3 seconds)
     const interval = setInterval(fetchHistory, 3000);
-
-    // 3. Cleanup when leaving
     return () => clearInterval(interval);
   }, [roomId]);
 
@@ -59,7 +52,25 @@ function ChatInterface({ roomId, username, onLeave }) {
     }
   };
 
-  try {
+  const sendMessage = async () => {
+    if (!inputText.trim() && !selectedImage) return;
+
+    // Optimistic UI Update
+    const newMsg = { sender_name: username, message: inputText, is_ai: false };
+    setMessages(prev => [...prev, newMsg]);
+    setLoading(true);
+    
+    const payload = {
+      room_id: roomId,
+      sender_name: username,
+      message: inputText,
+      image: selectedImage
+    };
+
+    setInputText(''); 
+    setSelectedImage(null);
+
+    try {
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,20 +81,22 @@ function ChatInterface({ roomId, username, onLeave }) {
       if (data.error) {
          setMessages(prev => [...prev, { sender_name: "SYSTEM", message: `⚠️ ${data.error}`, is_ai: true }]);
       } else if (data.ai_reply) {
-         // ONLY add the message if the AI actually replied
+         // ONLY add the message if the AI actually replied (@AI Triggered)
          setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
       }
-      // If data.ai_reply is null, we do nothing (the User message is already there)
       
     } catch (err) {
       setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST.", is_ai: true }]);
     }
+    setLoading(false);
+  };
 
   const handleQuickAction = (action) => {
+    // Quick Actions automatically add @AI so they always work
     let prompt = "";
-    if (action === "IDEAS") prompt = "Brainstorm 3 innovative ideas for this project.";
-    if (action === "RISKS") prompt = "Analyze potential risks and pitfalls.";
-    if (action === "PLAN") prompt = "Create a step-by-step execution plan.";
+    if (action === "IDEAS") prompt = "@AI Brainstorm 3 innovative ideas for this project.";
+    if (action === "RISKS") prompt = "@AI Analyze potential risks and pitfalls.";
+    if (action === "PLAN") prompt = "@AI Create a step-by-step execution plan.";
     setInputText(prompt);
   };
 
@@ -180,13 +193,14 @@ function ChatInterface({ roomId, username, onLeave }) {
         <div className="input-wrapper">
           <input type="file" ref={fileInputRef} style={{display: 'none'}} onChange={handleFileSelect} accept="image/*" />
           <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
-          <input         
+          <input 
             className="chat-input" 
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type message... (Use @AI to summon)"  // <-- UPDATED TEXT
-            disabled={loading}                    />
+            placeholder="Type message... (Use @AI to summon)" 
+            disabled={loading}
+          />
           <button className="send-btn" onClick={sendMessage} disabled={loading}>
             {loading ? "..." : "SEND"}
           </button>
