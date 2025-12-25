@@ -18,7 +18,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const recognitionRef = useRef(null); // Store the speech API instance
+  const recognitionRef = useRef(null); 
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,14 +47,12 @@ function ChatInterface({ roomId, username, onLeave }) {
     return () => clearInterval(interval);
   }, [roomId]);
 
-  // --- VOICE COMMAND SETUP ---
+  // --- VOICE COMMAND SETUP (ANTI-ECHO VERSION) ---
   const toggleMic = () => {
     if (isListening) {
-      // STOP LISTENING
       if (recognitionRef.current) recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      // START LISTENING
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       
       if (!SpeechRecognition) {
@@ -63,8 +61,8 @@ function ChatInterface({ roomId, username, onLeave }) {
       }
 
       const recognition = new SpeechRecognition();
-      recognition.continuous = false; // Stop after one sentence/pause
-      recognition.interimResults = false;
+      recognition.continuous = false; 
+      recognition.interimResults = false; // We only want final results
       recognition.lang = 'en-US';
 
       recognition.onstart = () => {
@@ -72,9 +70,13 @@ function ChatInterface({ roomId, username, onLeave }) {
       };
 
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        // Append spoken text to existing text
-        setInputText(prev => prev + (prev ? ' ' : '') + transcript);
+        // --- THE FIX: CHECK FOR 'isFinal' ---
+        const lastResult = event.results[event.results.length - 1];
+        
+        if (lastResult.isFinal) {
+            const transcript = lastResult[0].transcript;
+            setInputText(prev => prev + (prev ? ' ' : '') + transcript);
+        }
       };
 
       recognition.onend = () => {
@@ -246,7 +248,6 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
 
         <div className="input-wrapper">
-          {/* FILE INPUT */}
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -256,7 +257,6 @@ function ChatInterface({ roomId, username, onLeave }) {
           />
           <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
           
-          {/* VOICE INPUT BUTTON */}
           <button 
             className="attach-btn" 
             onClick={toggleMic} 
