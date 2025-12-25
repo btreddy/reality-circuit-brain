@@ -10,15 +10,21 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [loading, setLoading] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
   
-  // File Handling
+  // File & Voice State
   const [selectedFile, setSelectedFile] = useState(null); 
-  
-  // Voice Handling
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false); // Track if AI is talking
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const recognitionRef = useRef(null); 
+  const recognitionRef = useRef(null);
+  const silenceTimerRef = useRef(null); // Timer for Auto-Send
+  const inputTextRef = useRef(''); // Ref to track text inside the timer
+
+  // Keep the Ref in sync with State (Crucial for Auto-Send)
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,49 +53,108 @@ function ChatInterface({ roomId, username, onLeave }) {
     return () => clearInterval(interval);
   }, [roomId]);
 
-  // --- VOICE COMMAND SETUP (ANTI-ECHO VERSION) ---
-  const toggleMic = () => {
-    if (isListening) {
-      if (recognitionRef.current) recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      
-      if (!SpeechRecognition) {
-        alert("VOICE MODULE NOT SUPPORTED ON THIS BROWSER. TRY CHROME OR EDGE.");
+  // --- TEXT TO SPEECH (THE NARRATOR) 🔈 ---
+  const speakText = (text) => {
+    if ('speechSynthesis' in window) {
+      if (isSpeaking) {
+        window.speechSynthesis.cancel(); // Stop if already talking
+        setIsSpeaking(false);
         return;
       }
 
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false; 
-      recognition.interimResults = false; // We only want final results
-      recognition.lang = 'en-US';
+      // Clean text (remove formatting like ** and *)
+      const cleanText = text.replace(/\*\*/g, '').replace(/\*/g, '');
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      // Select a good voice (optional, defaults to system voice)
+      const voices = window.speechSynthesis.getVoices();
+      // Try to find a "Google US English" or similar if available
+      const preferredVoice = voices.find(v => v.name.includes("Google US English")) || voices[0];
+      if (preferredVoice) utterance.voice = preferredVoice;
 
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
+      utterance.onend = () => setIsSpeaking(false);
+      
+      setIsSpeaking(true);
+      window.speechSynthesis.speak(utterance);
+    } else {
+      alert("Text-to-Speech not supported on this browser.");
+    }
+  };
 
-      recognition.onresult = (event) => {
-        // --- THE FIX: CHECK FOR 'isFinal' ---
-        const lastResult = event.results[event.results.length - 1];
-        
-        if (lastResult.isFinal) {
-            const transcript = lastResult[0].transcript;
-            setInputText(prev => prev + (prev ? ' ' : '') + transcript);
+  // --- VOICE COMMAND (AUTO-SEND VERSION) 🎙️ ---
+  const toggleMic = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("VOICE MODULE NOT SUPPORTED. USE CHROME.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true; // Keep listening until silence
+    recognition.interimResults = true; // Need interim to detect "activity"
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setIsListening(true);
+    
+    recognition.onresult = (event) => {
+      // 1. Get the latest transcript
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
         }
-      };
+      }
 
-      recognition.onend = () => {
+      if (finalTranscript) {
+         setInputText(prev => prev + (prev ? ' ' : '') + finalTranscript);
+      }
+
+      // 2. RESET SILENCE TIMER (The "Auto-Send" Logic) ⏱️
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      
+      // Set new timer: If 5 seconds pass with NO result, we send.
+      silenceTimerRef.current = setTimeout(() => {
+        console.log("Auto-Send Triggered due to Silence...");
+        stopListening(); // This stops the mic
+        // We use a slight delay to ensure state updates, then send
+        setTimeout(() => triggerAutoSend(), 500); 
+      }, 5000); 
+    };
+
+    recognition.onend = () => {
+        // If it stopped naturally, just clear state
         setIsListening(false);
-      };
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
 
-      recognition.onerror = (event) => {
-        console.error("Voice Error:", event.error);
-        setIsListening(false);
-      };
+    recognition.onerror = (event) => {
+      console.error("Voice Error:", event.error);
+      setIsListening(false);
+    };
 
-      recognitionRef.current = recognition;
-      recognition.start();
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) recognitionRef.current.stop();
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    setIsListening(false);
+  };
+
+  // Helper to bypass the "event" requirement of sendMessage
+  const triggerAutoSend = () => {
+    // Check the REF (Current Value) not the State (Stale Value)
+    if (inputTextRef.current && inputTextRef.current.trim().length > 0) {
+        sendMessage(null, inputTextRef.current); 
     }
   };
 
@@ -111,17 +176,20 @@ function ChatInterface({ roomId, username, onLeave }) {
   };
 
   // --- SEND MESSAGE ---
-  const sendMessage = async () => {
-    if (!inputText.trim() && !selectedFile) return;
+  // Updated to accept optional textOverride for the Auto-Send feature
+  const sendMessage = async (e, textOverride = null) => {
+    const textToSend = textOverride !== null ? textOverride : inputText;
+    
+    if (!textToSend.trim() && !selectedFile) return;
 
-    const newMsg = { sender_name: username, message: inputText, is_ai: false };
+    const newMsg = { sender_name: username, message: textToSend, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
     setLoading(true);
     
     const payload = {
       room_id: roomId,
       sender_name: username,
-      message: inputText,
+      message: textToSend,
       file_data: selectedFile ? selectedFile.data : null,
       file_type: selectedFile ? selectedFile.type : null
     };
@@ -149,6 +217,7 @@ function ChatInterface({ roomId, username, onLeave }) {
     setLoading(false);
   };
 
+  // --- UI FORMATTING ---
   const handleQuickAction = (action) => {
     let prompt = "";
     if (action === "IDEAS") prompt = "@AI Brainstorm 3 innovative ideas for this project.";
@@ -233,7 +302,17 @@ function ChatInterface({ roomId, username, onLeave }) {
       <div className="chat-window">
         {messages.map((msg, index) => (
           <div key={index} className={`message-box ${msg.is_ai ? 'ai' : 'user'}`}>
-            <span className="sender-label">{msg.sender_name}</span>
+            <span className="sender-label">
+              {msg.sender_name} 
+              {/* SPEAKER BUTTON FOR ALL MESSAGES */}
+              <button 
+                className="speak-btn" 
+                onClick={() => speakText(msg.message)}
+                title="Read Aloud"
+              >
+                 🔈
+              </button>
+            </span>
             <div className="message-content">{formatMessage(msg.message)}</div>
           </div>
         ))}
@@ -267,7 +346,7 @@ function ChatInterface({ roomId, username, onLeave }) {
             }}
             title="Push to Talk"
           >
-            {isListening ? '⏺' : '🎙️'}
+            {isListening ? '🛑' : '🎙️'}
           </button>
           
           <input 
@@ -275,10 +354,10 @@ function ChatInterface({ roomId, username, onLeave }) {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder={isListening ? "Listening..." : "Type or use Mic (@AI to summon)"}
+            placeholder={isListening ? "Listening... (Auto-send in 5s)" : "Type or use Mic"}
             disabled={loading}
           />
-          <button className="send-btn" onClick={sendMessage} disabled={loading}>
+          <button className="send-btn" onClick={() => sendMessage(null)} disabled={loading}>
             {loading ? "..." : "SEND"}
           </button>
         </div>
