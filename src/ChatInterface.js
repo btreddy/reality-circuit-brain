@@ -10,11 +10,15 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [loading, setLoading] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
   
-  // CHANGED: Now stores an object { data, type, name } instead of just a string
+  // File Handling
   const [selectedFile, setSelectedFile] = useState(null); 
+  
+  // Voice Handling
+  const [isListening, setIsListening] = useState(false);
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const recognitionRef = useRef(null); // Store the speech API instance
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,13 +47,56 @@ function ChatInterface({ roomId, username, onLeave }) {
     return () => clearInterval(interval);
   }, [roomId]);
 
-  // --- 1. UPDATED FILE HANDLER (Supports PDF/DOCS) ---
+  // --- VOICE COMMAND SETUP ---
+  const toggleMic = () => {
+    if (isListening) {
+      // STOP LISTENING
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      // START LISTENING
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        alert("VOICE MODULE NOT SUPPORTED ON THIS BROWSER. TRY CHROME OR EDGE.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false; // Stop after one sentence/pause
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        // Append spoken text to existing text
+        setInputText(prev => prev + (prev ? ' ' : '') + transcript);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Voice Error:", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    }
+  };
+
+  // --- FILE HANDLING ---
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Store file data, type, and name
         setSelectedFile({ 
             data: reader.result.split(',')[1], 
             type: file.type || 'application/octet-stream',
@@ -61,11 +108,10 @@ function ChatInterface({ roomId, username, onLeave }) {
     }
   };
 
-  // --- 2. UPDATED SEND LOGIC (Sends File Type) ---
+  // --- SEND MESSAGE ---
   const sendMessage = async () => {
     if (!inputText.trim() && !selectedFile) return;
 
-    // Optimistic UI Update
     const newMsg = { sender_name: username, message: inputText, is_ai: false };
     setMessages(prev => [...prev, newMsg]);
     setLoading(true);
@@ -74,12 +120,12 @@ function ChatInterface({ roomId, username, onLeave }) {
       room_id: roomId,
       sender_name: username,
       message: inputText,
-      file_data: selectedFile ? selectedFile.data : null, // Send the base64 data
-      file_type: selectedFile ? selectedFile.type : null  // Send the MIME type (pdf/image/word)
+      file_data: selectedFile ? selectedFile.data : null,
+      file_type: selectedFile ? selectedFile.type : null
     };
 
     setInputText(''); 
-    setSelectedFile(null); // Clear file after sending
+    setSelectedFile(null); 
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
@@ -200,7 +246,7 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
 
         <div className="input-wrapper">
-          {/* --- 3. UPDATED INPUT TAG (Supports PDF, DOC, IMAGES) --- */}
+          {/* FILE INPUT */}
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -208,15 +254,28 @@ function ChatInterface({ roomId, username, onLeave }) {
             onChange={handleFileSelect} 
             accept="image/*,.pdf,.doc,.docx" 
           />
-          
           <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
+          
+          {/* VOICE INPUT BUTTON */}
+          <button 
+            className="attach-btn" 
+            onClick={toggleMic} 
+            style={{ 
+              color: isListening ? '#ff0000' : '#00ff41', 
+              borderColor: isListening ? '#ff0000' : '#00ff41',
+              animation: isListening ? 'pulse 1s infinite' : 'none' 
+            }}
+            title="Push to Talk"
+          >
+            {isListening ? '⏺' : '🎙️'}
+          </button>
           
           <input 
             className="chat-input" 
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type message... (Use @AI to summon)" 
+            placeholder={isListening ? "Listening..." : "Type or use Mic (@AI to summon)"}
             disabled={loading}
           />
           <button className="send-btn" onClick={sendMessage} disabled={loading}>
