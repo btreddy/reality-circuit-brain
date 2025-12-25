@@ -7,14 +7,13 @@ import google.generativeai as genai
 import base64
 from io import BytesIO
 from PIL import Image
-# NEW IMPORTS FOR DOCS
 from pypdf import PdfReader
 from docx import Document
 
 # --- CONFIGURATION ---
 app = Flask(__name__, static_folder='build', static_url_path='/')
 
-# 1. ENABLE CORS FOR EVERYTHING
+# 1. ENABLE CORS
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Database Setup
@@ -43,42 +42,59 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-def generate_smart_content(prompt_text, file_data=None, file_type=None):
+# --- AI ENGINE WITH CONTEXT MEMORY ---
+def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        content_parts = [prompt_text]
+        
+        # Construct the Master Prompt
+        # We feed it the history so it knows what is going on
+        master_prompt = f"""
+        You are a high-level Strategic Advisor in a "War Room".
+        
+        --- CONTEXT / PREVIOUS CHAT HISTORY ---
+        {history_context}
+        ---------------------------------------
+        
+        USER REQUEST: {current_prompt}
+        
+        INSTRUCTIONS:
+        1. Use the Context above to understand the project (e.g., if we talked about Coffee, keep talking about Coffee).
+        2. Be direct, tactical, and actionable. No fluff.
+        3. If the user asks for a PLAN, RISKS, or IDEAS, base it specifically on the topics discussed in history.
+        """
 
+        content_parts = [master_prompt]
+        
         if file_data and file_type:
             file_bytes = base64.b64decode(file_data)
             file_stream = BytesIO(file_bytes)
 
             if "image" in file_type:
-                # Handle Images (Vision)
                 image = Image.open(file_stream)
                 content_parts.append(image)
-
+            
             elif "pdf" in file_type:
-                # Handle PDF (Extract Text)
                 try:
                     reader = PdfReader(file_stream)
                     pdf_text = "\n".join([page.extract_text() for page in reader.pages])
-                    content_parts.append(f"\n[DOCUMENT CONTENT]:\n{pdf_text}")
+                    content_parts.append(f"\n[NEW DOCUMENT ATTACHED]:\n{pdf_text}")
                 except:
                     return "ERROR: Could not read PDF file."
 
             elif "word" in file_type or "officedocument" in file_type:
-                # Handle Word Docs (Extract Text)
                 try:
                     doc = Document(file_stream)
                     doc_text = "\n".join([para.text for para in doc.paragraphs])
-                    content_parts.append(f"\n[DOCUMENT CONTENT]:\n{doc_text}")
+                    content_parts.append(f"\n[NEW DOCUMENT ATTACHED]:\n{doc_text}")
                 except:
                     return "ERROR: Could not read Word file."
 
         response = model.generate_content(content_parts)
         return response.text.strip()
     except Exception as e:
-        return f"AI ANALYST ERROR: {str(e)}"
+        return f"AI ERROR: {str(e)}"
+
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -161,35 +177,43 @@ def send_chat():
                 (room_id, sender_name, display_message, False))
     conn.commit()
     
-    # --- 2. THE NEW TRIGGER LIST (WAKE WORDS) 🔫 ---
-    # The AI will respond if ANY of these words are in the message:
+    # 2. TRIGGER LOGIC
     triggers = ["@ai", "radar", "system", "computer", "btr", "jarvis"]
-    
     msg_lower = message.lower()
     is_triggered = any(t in msg_lower for t in triggers)
-    
     should_reply = is_triggered or file_data is not None
+    
     ai_reply = None
     
     if should_reply:
-        # Clean the prompt: Remove the trigger word so the AI doesn't get confused
+        # A. Clean the prompt
         clean_prompt = message
         for t in triggers:
             clean_prompt = clean_prompt.replace(t, "").replace(t.upper(), "").replace(t.capitalize(), "")
-            
         clean_prompt = clean_prompt.strip()
-        
-        # If prompt became empty (e.g. user just said "Radar"), add a default prompt
         if not clean_prompt and not file_data:
             clean_prompt = "Hello, I am listening. What is the status?"
 
-        ai_reply = generate_smart_content(clean_prompt, file_data, file_type)
+        # B. FETCH HISTORY (THE MEMORY FIX) 🧠
+        # Get last 15 messages to give context
+        cur.execute("SELECT sender_name, message FROM room_chats WHERE room_id = %s ORDER BY timestamp DESC LIMIT 15", (room_id,))
+        rows = cur.fetchall()
+        # Reverse them so they are in chronological order (Old -> New)
+        history_rows = rows[::-1] 
+        
+        history_text = ""
+        for row in history_rows:
+            history_text += f"{row['sender_name']}: {row['message']}\n"
+
+        # C. Generate Reply with History
+        ai_reply = generate_smart_content(history_text, clean_prompt, file_data, file_type)
 
         cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                     (room_id, "Reality Circuit", ai_reply, True))
         conn.commit()
 
     cur.close(); conn.close()
+    
     return jsonify({"status": "SENT", "ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
@@ -241,7 +265,5 @@ def serve(path):
 if __name__ == '__main__':
     with app.app_context():
         init_db()
-    
-    # FIX: Use the PORT provided by Render, or default to 5000 for local testing
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
