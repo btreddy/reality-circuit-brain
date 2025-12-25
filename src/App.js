@@ -50,42 +50,29 @@ function Login({ onLogin, onBack, targetRoom }) {
     setIsLoading(false);
   };
 
+  import LandingPage from './LandingPage'; // Import the new page
+
+function App() {
+  const [session, setSession] = useState(null);
+  const [view, setView] = useState('LANDING'); // New State: 'LANDING', 'LOGIN', 'CHAT'
+
+  // ... (keep your existing checkSession logic)
+
+  // UPDATE THE RENDER LOGIC:
+  if (session) {
+    return <ChatInterface ... />;
+  }
+
+  if (view === 'LOGIN') {
+    return <Login onLogin={handleLogin} onBack={() => setView('LANDING')} />;
+  }
+
+  // Default: Show Landing Page
   return (
-    <div className="login-container">
-      <div className="login-box">
-        {/* Dynamic Header based on Invite Status */}
-        <h1 className="glitch" data-text={targetRoom ? "JOIN SQUAD" : "WAR ROOM ACCESS"}>
-          {targetRoom ? "JOIN SQUAD" : "WAR ROOM ACCESS"}
-        </h1>
-        
-        <p className="subtitle">
-          {targetRoom ? `TARGET ROOM: ${targetRoom}` : (isRegistering ? "INITIATE PROTOCOL" : "IDENTIFICATION REQUIRED")}
-        </p>
-        
-        <div className="input-group">
-          <label>STRATEGIC ID (EMAIL)</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="input-group">
-          <label>ACCESS CODE</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-
-        {error && <div className="error-msg">{error}</div>}
-
-        <button onClick={handleSubmit} disabled={isLoading} className="login-btn">
-          {isLoading ? "AUTHENTICATING..." : (isRegistering ? "CREATE ID" : "AUTHENTICATE")}
-        </button>
-
-        <div className="toggle-link" onClick={() => setIsRegistering(!isRegistering)}>
-          [ {isRegistering ? "RETURN TO LOGIN" : "NEW WARRIOR REGISTRATION"} ]
-        </div>
-        
-        <div className="toggle-link" style={{marginTop: '10px', color: '#555'}} onClick={onBack}>
-          &lt;&lt; BACK TO HOME
-        </div>
-      </div>
-    </div>
+    <LandingPage 
+      onGetStarted={() => setView('LOGIN')} 
+      onLogin={() => setView('LOGIN')} 
+    />
   );
 }
 
