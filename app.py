@@ -146,12 +146,12 @@ def send_chat():
     room_id = data.get('room_id')
     sender_name = data.get('sender_name')
     message = data.get('message', '')
-    file_data = data.get('file_data', None) # Renamed from image
-    file_type = data.get('file_type', None) # New field
+    file_data = data.get('file_data', None)
+    file_type = data.get('file_type', None)
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-
+    
     # 1. Save User Message
     display_message = message
     if file_data:
@@ -160,19 +160,35 @@ def send_chat():
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, sender_name, display_message, False))
     conn.commit()
-
-    # 2. SMART AI CHECK (@AI or File trigger)
-    should_reply = "@ai" in message.lower() or file_data is not None
+    
+    # --- 2. THE NEW TRIGGER LIST (WAKE WORDS) 🔫 ---
+    # The AI will respond if ANY of these words are in the message:
+    triggers = ["@ai", "radar", "system", "computer", "btr", "jarvis"]
+    
+    msg_lower = message.lower()
+    is_triggered = any(t in msg_lower for t in triggers)
+    
+    should_reply = is_triggered or file_data is not None
     ai_reply = None
-
+    
     if should_reply:
-        clean_prompt = message.replace("@ai", "").replace("@AI", "").strip()
-        # Pass the file data AND type to the generator
+        # Clean the prompt: Remove the trigger word so the AI doesn't get confused
+        clean_prompt = message
+        for t in triggers:
+            clean_prompt = clean_prompt.replace(t, "").replace(t.upper(), "").replace(t.capitalize(), "")
+            
+        clean_prompt = clean_prompt.strip()
+        
+        # If prompt became empty (e.g. user just said "Radar"), add a default prompt
+        if not clean_prompt and not file_data:
+            clean_prompt = "Hello, I am listening. What is the status?"
+
         ai_reply = generate_smart_content(clean_prompt, file_data, file_type)
 
         cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                     (room_id, "Reality Circuit", ai_reply, True))
         conn.commit()
+
     cur.close(); conn.close()
     return jsonify({"status": "SENT", "ai_reply": ai_reply})
 
