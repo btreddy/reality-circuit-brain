@@ -59,38 +59,25 @@ function ChatInterface({ roomId, username, onLeave }) {
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() && !selectedImage) return;
-
-    // Optimistic UI Update (Shows your msg instantly)
-    // Note: The next Radar Sweep will overwrite this with the confirmed data from server
-    const newMsg = { sender_name: username, message: inputText, is_ai: false };
-    setMessages(prev => [...prev, newMsg]);
-    
-    setLoading(true);
-    const payload = {
-      room_id: roomId,
-      sender_name: username,
-      message: inputText,
-      image: selectedImage
-    };
-
-    setInputText(''); 
-    setSelectedImage(null);
-
-    try {
-      await fetch(`${API_BASE_URL}/api/chat/send`, {
+  try {
+      const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      // We don't need to manually handle the response here because 
-      // the Radar Sweep (useEffect) will pick up the AI reply automatically in 3 seconds.
+      const data = await res.json();
+      
+      if (data.error) {
+         setMessages(prev => [...prev, { sender_name: "SYSTEM", message: `⚠️ ${data.error}`, is_ai: true }]);
+      } else if (data.ai_reply) {
+         // ONLY add the message if the AI actually replied
+         setMessages(prev => [...prev, { sender_name: "Reality Circuit", message: data.ai_reply, is_ai: true }]);
+      }
+      // If data.ai_reply is null, we do nothing (the User message is already there)
+      
     } catch (err) {
       setMessages(prev => [...prev, { sender_name: "SYSTEM", message: "❌ CONNECTION LOST.", is_ai: true }]);
     }
-    setLoading(false);
-  };
 
   const handleQuickAction = (action) => {
     let prompt = "";
@@ -193,14 +180,13 @@ function ChatInterface({ roomId, username, onLeave }) {
         <div className="input-wrapper">
           <input type="file" ref={fileInputRef} style={{display: 'none'}} onChange={handleFileSelect} accept="image/*" />
           <button className="attach-btn" onClick={() => fileInputRef.current.click()}>📎</button>
-          <input 
+          <input         
             className="chat-input" 
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type message..." 
-            disabled={loading}
-          />
+            placeholder="Type message... (Use @AI to summon)"  // <-- UPDATED TEXT
+            disabled={loading}                    />
           <button className="send-btn" onClick={sendMessage} disabled={loading}>
             {loading ? "..." : "SEND"}
           </button>

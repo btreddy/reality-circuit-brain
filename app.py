@@ -161,15 +161,12 @@ def send_chat():
     room_id = data.get('room_id')
     sender_name = data.get('sender_name')
     message = data.get('message', '')
-    image_data = data.get('image', None) # New Field
-
-    # ... (Keep your existing VIP/Limit logic here if you want) ...
+    image_data = data.get('image', None)
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-
-    # 1. Save User Message
-    # If there is an image, we append a [IMAGE UPLOADED] tag to the text for history
+    
+    # 1. Save User Message (Always save what the human said)
     display_message = message
     if image_data:
         display_message += " \n[📎 IMAGE ATTACHED]"
@@ -177,17 +174,29 @@ def send_chat():
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, sender_name, display_message, False))
     conn.commit()
+    
+    # 2. THE SMART GATEKEEPER CHECK 🛡️
+    # logic: Only reply if message contains "@AI" (case insensitive) OR if an image is attached (assume they want analysis)
+    should_reply = "@ai" in message.lower() or image_data is not None
+    
+    ai_reply = None
+    
+    if should_reply:
+        # Remove the trigger word "@AI" from the prompt so the AI doesn't get confused
+        clean_prompt = message.replace("@ai", "").replace("@AI", "").strip()
+        
+        # Generate Reply
+        ai_reply = generate_smart_content(clean_prompt, image_data)
 
-    # 2. Generate AI Reply (With Image if present)
-    ai_reply = generate_smart_content(message, image_data)
+        # Save AI Reply
+        cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
+                    (room_id, "Reality Circuit", ai_reply, True))
+        conn.commit()
 
-    # 3. Save AI Reply
-    cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
-                (room_id, "Reality Circuit", ai_reply, True))
-    conn.commit()
     cur.close(); conn.close()
-
-    return jsonify({"ai_reply": ai_reply})
+    
+    # Return result (ai_reply might be None now, which is fine)
+    return jsonify({"status": "SENT", "ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
 def get_history():
