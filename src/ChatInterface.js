@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Mermaid from './Mermaid'; // <--- IMPORT THE VISUAL ENGINE
+import React, { useState, useEffect, useRef, useCallback } from 'react'; // <--- Added useCallback
+import Mermaid from './Mermaid';
 import './Main.css';
 
-const API_BASE_URL = "https://reality-circuit-brain.onrender.com"; // Hardcoded for safety
+const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
@@ -13,19 +13,8 @@ function ChatInterface({ roomId, username, onLeave }) {
   
   const messagesEndRef = useRef(null);
 
-  // 1. Fetch History on Load
-  useEffect(() => {
-    fetchHistory();
-    const interval = setInterval(fetchHistory, 10000); // Poll every 5s for sync
-    return () => clearInterval(interval);
-  }, []);
-
-  // 2. Auto-scroll to bottom
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const fetchHistory = async () => {
+  // 1. DEFINITION: Wrapped in useCallback to satisfy the Build System
+  const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
@@ -33,28 +22,39 @@ function ChatInterface({ roomId, username, onLeave }) {
     } catch (err) {
       console.error("History fetch error:", err);
     }
-  };
+  }, [roomId]); // Only recreate if roomId changes
+
+  // 2. EFFECT: Now safe to include fetchHistory in dependencies
+  useEffect(() => {
+    fetchHistory();
+    const interval = setInterval(fetchHistory, 10000); // Slower polling (10s) for stability
+    return () => clearInterval(interval);
+  }, [fetchHistory]);
+
+  // 3. Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim() && !file) return;
 
     const userMsg = input;
-    setInput(''); // Clear input immediately for UX
+    setInput('');
     setLoading(true);
 
-    // Prepare File Data if exists
     let fileData = null;
     let fileType = null;
 
     if (file) {
       const reader = new FileReader();
       reader.onloadend = async () => {
-        fileData = reader.result.split(',')[1]; // Base64 clean
+        fileData = reader.result.split(',')[1];
         fileType = file.type;
         await sendToBackend(userMsg, fileData, fileType);
       };
       reader.readAsDataURL(file);
-      setFile(null); // Clear file
+      setFile(null);
     } else {
       await sendToBackend(userMsg, null, null);
     }
@@ -70,24 +70,19 @@ function ChatInterface({ roomId, username, onLeave }) {
         file_type: fType
       };
 
-      // Optimistic Update (Show user message immediately)
-      // Note: The backend will save it and we will fetch it back, but this feels faster.
-      
-      const res = await fetch(`${API_BASE_URL}/api/chat/send`, {
+      await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       
-      await res.json();
-      fetchHistory(); // Force refresh to see AI reply
+      fetchHistory(); // Force refresh
     } catch (err) {
       console.error("Send error:", err);
     }
     setLoading(false);
   };
 
-  // --- VOICE LOGIC (Placeholder for now) ---
   const toggleMic = () => {
     setIsRecording(!isRecording);
     if (!isRecording) {
@@ -95,13 +90,10 @@ function ChatInterface({ roomId, username, onLeave }) {
     }
   };
 
-  // --- RENDER HELPERS ---
   const renderMessageContent = (msgContent) => {
-    // CHECK: Does this message contain a Mermaid Diagram code block?
     if (msgContent.includes('```mermaid')) {
       const parts = msgContent.split('```mermaid');
       const introText = parts[0];
-      // Extract code between ```mermaid and the closing ```
       const chartCode = parts[1].split('```')[0];
       
       return (
@@ -113,14 +105,11 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
       );
     }
-    
-    // Default: Just text
     return <div style={{ whiteSpace: 'pre-wrap' }}>{msgContent}</div>;
   };
 
   return (
     <div className="chat-container">
-      {/* HEADER */}
       <div className="chat-header">
         <div className="header-title">
           <span className="status-dot"></span> WAR ROOM: <span className="highlight">{username.split('@')[0]}</span>
@@ -130,34 +119,27 @@ function ChatInterface({ roomId, username, onLeave }) {
         </div>
       </div>
 
-      {/* CHAT WINDOW */}
       <div className="chat-window">
         {messages.map((msg, index) => (
           <div key={index} className={`message-row ${msg.is_ai || msg.sender_name === 'Reality Circuit' ? 'ai-row' : 'user-row'}`}>
-            
             <div className={`message-bubble ${msg.is_ai || msg.sender_name === 'Reality Circuit' ? 'ai-bubble' : 'user-bubble'}`}>
               <div className="msg-sender">
                 {msg.sender_name} 
                 {msg.is_ai && " ⚡"}
               </div>
-              
-              {/* THE NEW VISUAL RENDERER */}
               <div className="msg-content">
                 {renderMessageContent(msg.message)}
               </div>
-
               <div className="msg-time">
                 {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
               </div>
             </div>
-
           </div>
         ))}
         {loading && <div className="loading-indicator">⚡ PROCESSING STRATEGY...</div>}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* INPUT AREA */}
       <div className="input-area">
         <div className="toolbar">
            {file ? <span className="file-badge">📎 {file.name}</span> : null}
