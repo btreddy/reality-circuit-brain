@@ -47,22 +47,40 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
-        # Construct the Master Prompt
-        # We feed it the history so it knows what is going on
-        master_prompt = f"""
-        You are a high-level Strategic Advisor in a "War Room".
-        
-        --- CONTEXT / PREVIOUS CHAT HISTORY ---
-        {history_context}
-        ---------------------------------------
-        
-        USER REQUEST: {current_prompt}
-        
-        INSTRUCTIONS:
-        1. Use the Context above to understand the project (e.g., if we talked about Coffee, keep talking about Coffee).
-        2. Be direct, tactical, and actionable. No fluff.
-        3. If the user asks for a PLAN, RISKS, or IDEAS, base it specifically on the topics discussed in history.
-        """
+       # ... inside generate_smart_content function ...
+
+    # REPLACE THE OLD PROMPT WITH THIS NEW "VISUAL + MEMORY" PROMPT:
+    master_prompt = f"""
+    You are a high-level Strategic Advisor in a "War Room".
+    
+    --- VISUAL CAPABILITY UNLOCKED (CRITICAL) ---
+    If the user asks for a Plan, Flowchart, Process, Funnel, or Structure, you MUST provide a Mermaid.js diagram.
+    
+    RULES FOR DIAGRAMS:
+    1. Use 'graph TD' (Top Down) or 'mindmap'.
+    2. Wrap the code in ```mermaid ... ``` blocks.
+    3. Keep labels short and punchy.
+    
+    Example Output format:
+    Here is the visual plan:
+    ```mermaid
+    graph TD
+      A[Start] --> B{Decision}
+      B -->|Yes| C[Action]
+      B -->|No| D[Stop]
+    ```
+
+    --- CONTEXT / PREVIOUS CHAT HISTORY ---
+    {history_context}
+    ---------------------------------------
+    
+    USER REQUEST: {current_prompt}
+    
+    INSTRUCTIONS:
+    1. Use the Context above to understand the project.
+    2. Be direct, tactical, and actionable. No fluff.
+    3. If the request implies a visual structure (like "map this out"), use the Mermaid format above.
+    """
 
         content_parts = [master_prompt]
         
