@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'; // <--- Added useCallback
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Mermaid from './Mermaid';
 import './Main.css';
 
@@ -13,7 +13,8 @@ function ChatInterface({ roomId, username, onLeave }) {
   
   const messagesEndRef = useRef(null);
 
-  // 1. DEFINITION: Wrapped in useCallback to satisfy the Build System
+  // --- CORE FUNCTIONS ---
+
   const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
@@ -22,19 +23,19 @@ function ChatInterface({ roomId, username, onLeave }) {
     } catch (err) {
       console.error("History fetch error:", err);
     }
-  }, [roomId]); // Only recreate if roomId changes
+  }, [roomId]);
 
-  // 2. EFFECT: Now safe to include fetchHistory in dependencies
   useEffect(() => {
     fetchHistory();
-    const interval = setInterval(fetchHistory, 10000); // Slower polling (10s) for stability
+    const interval = setInterval(fetchHistory, 10000); // 10s Heartbeat
     return () => clearInterval(interval);
   }, [fetchHistory]);
 
-  // 3. Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // --- BUTTON HANDLERS (RESTORED) ---
 
   const handleSend = async () => {
     if (!input.trim() && !file) return;
@@ -76,26 +77,58 @@ function ChatInterface({ roomId, username, onLeave }) {
         body: JSON.stringify(payload)
       });
       
-      fetchHistory(); // Force refresh
+      fetchHistory(); 
     } catch (err) {
       console.error("Send error:", err);
     }
     setLoading(false);
   };
 
-  const toggleMic = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-        alert("Microphone Logic: Connect your Speech-to-Text API here in v4.0");
+  // ☢️ NUKE FUNCTION (Clear Chat)
+  const handleNuke = async () => {
+    if (!window.confirm("WARNING: RADIOLOGICAL HAZARD.\nThis will permanently erase all War Room memory.\n\nProceed?")) return;
+    
+    try {
+      await fetch(`${API_BASE_URL}/api/chat/nuke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId })
+      });
+      setMessages([]); // Clear locally immediately
+    } catch (err) {
+      alert("NUKE FAILED: " + err.message);
     }
   };
 
+  // 💾 SAVE FUNCTION (Download Transcript)
+  const handleSave = () => {
+    const text = messages.map(m => `[${m.sender_name}]: ${m.message}`).join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `WAR_ROOM_LOG_${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+  };
+
+  // 🔗 INVITE FUNCTION (Copy Link)
+  const handleInvite = () => {
+    const url = window.location.href; // Copies current URL
+    navigator.clipboard.writeText(url);
+    alert("SECURE LINK COPIED TO CLIPBOARD.\nSend this to your operatives.");
+  };
+
+  const toggleMic = () => {
+    setIsRecording(!isRecording);
+    if (!isRecording) alert("Microphone active (Simulation Mode)");
+  };
+
+  // --- RENDER VISUALS ---
   const renderMessageContent = (msgContent) => {
     if (msgContent.includes('```mermaid')) {
       const parts = msgContent.split('```mermaid');
       const introText = parts[0];
       const chartCode = parts[1].split('```')[0];
-      
       return (
         <div>
           <div style={{ whiteSpace: 'pre-wrap' }}>{introText}</div>
@@ -110,12 +143,16 @@ function ChatInterface({ roomId, username, onLeave }) {
 
   return (
     <div className="chat-container">
+      {/* HEADER RESTORED */}
       <div className="chat-header">
         <div className="header-title">
           <span className="status-dot"></span> WAR ROOM: <span className="highlight">{username.split('@')[0]}</span>
         </div>
         <div className="header-controls">
-           <button className="nav-btn" onClick={onLeave}>🔴 EXIT</button>
+           <button className="nav-btn" onClick={handleInvite} title="Invite Operative">🔗 INVITE</button>
+           <button className="nav-btn" onClick={handleSave} title="Save Log">💾</button>
+           <button className="nav-btn" onClick={handleNuke} title="Wipe Memory">☢️</button>
+           <button className="nav-btn" onClick={onLeave} style={{marginLeft: '15px'}}>🔴 EXIT</button>
         </div>
       </div>
 
