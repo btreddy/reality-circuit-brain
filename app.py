@@ -180,6 +180,7 @@ def send_chat():
     message = data.get('message', '')
     file_data = data.get('file_data', None)
     file_type = data.get('file_type', None)
+    language = data.get('language', 'English') # <--- NEW: Grab Language
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -207,9 +208,9 @@ def send_chat():
             clean_prompt = clean_prompt.replace(t, "").replace(t.upper(), "").replace(t.capitalize(), "")
         clean_prompt = clean_prompt.strip()
         if not clean_prompt and not file_data:
-            clean_prompt = "Hello, I am listening. What is the status?"
+            clean_prompt = "Status Report?"
 
-        # B. FETCH HISTORY (THE MEMORY FIX) 🧠
+        # B. FETCH HISTORY
         cur.execute("SELECT sender_name, message FROM room_chats WHERE room_id = %s ORDER BY timestamp DESC LIMIT 15", (room_id,))
         rows = cur.fetchall()
         history_rows = rows[::-1] 
@@ -218,8 +219,11 @@ def send_chat():
         for row in history_rows:
             history_text += f"{row['sender_name']}: {row['message']}\n"
 
-        # C. Generate Reply with History
-        ai_reply = generate_smart_content(history_text, clean_prompt, file_data, file_type)
+        # C. INJECT LANGUAGE INSTRUCTION
+        # We append the language instruction directly to the prompt so the AI obeys instantly.
+        final_prompt = f"{clean_prompt} \n\n(IMPORTANT: Answer in {language} language. If Telugu, use clear, professional Telugu script.)"
+
+        ai_reply = generate_smart_content(history_text, final_prompt, file_data, file_type)
 
         cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                     (room_id, "Reality Circuit", ai_reply, True))

@@ -7,11 +7,12 @@ const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
+  const [language, setLanguage] = useState('English'); // Default Language
   
   const messagesEndRef = useRef(null);
+  const chatWindowRef = useRef(null); // Ref for scroll control
 
   // --- CORE FUNCTIONS ---
 
@@ -19,7 +20,15 @@ function ChatInterface({ roomId, username, onLeave }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
-      setMessages(data);
+      
+      // SMART SCROLL FIX: Only update if we actually have new messages
+      setMessages(prev => {
+        if (prev.length !== data.length) {
+          return data;
+        }
+        return prev; 
+      });
+
     } catch (err) {
       console.error("History fetch error:", err);
     }
@@ -27,15 +36,16 @@ function ChatInterface({ roomId, username, onLeave }) {
 
   useEffect(() => {
     fetchHistory();
-    const interval = setInterval(fetchHistory, 10000); // 10s Heartbeat
+    const interval = setInterval(fetchHistory, 5000); 
     return () => clearInterval(interval);
   }, [fetchHistory]);
 
+  // SCROLL LOGIC: Only scroll when message count changes (Prevents jumping while reading)
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length]);
 
-  // --- BUTTON HANDLERS (RESTORED) ---
+  // --- BUTTON HANDLERS ---
 
   const handleSend = async () => {
     if (!input.trim() && !file) return;
@@ -68,7 +78,8 @@ function ChatInterface({ roomId, username, onLeave }) {
         sender_name: username,
         message: msg,
         file_data: fData,
-        file_type: fType
+        file_type: fType,
+        language: language // <--- SEND CHOSEN LANGUAGE
       };
 
       await fetch(`${API_BASE_URL}/api/chat/send`, {
@@ -84,26 +95,19 @@ function ChatInterface({ roomId, username, onLeave }) {
     setLoading(false);
   };
 
-  // ☢️ NUKE FUNCTION (Clear Chat)
-  const handleNuke = async () => {
-    if (!window.confirm("WARNING: RADIOLOGICAL HAZARD.\nThis will permanently erase all War Room memory.\n\nProceed?")) return;
-    
-    try {
-      await fetch(`${API_BASE_URL}/api/chat/nuke`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_id: roomId })
-      });
-      setMessages([]); // Clear locally immediately
-    } catch (err) {
-      alert("NUKE FAILED: " + err.message);
-    }
+  // 📄 PDF FUNCTION (Uses Native Print)
+  const handlePrintPDF = () => {
+    // We create a temporary print view
+    window.print(); 
   };
 
-  // 💾 SAVE FUNCTION (Download Transcript)
-  const handleSave = () => {
+  // 💾 SAVE TXT FUNCTION (Fixed for Telugu)
+  const handleSaveTxt = () => {
     const text = messages.map(m => `[${m.sender_name}]: ${m.message}`).join('\n\n');
-    const blob = new Blob([text], { type: 'text/plain' });
+    
+    // THE SECRET SAUCE: \uFEFF is the Byte Order Mark that tells Windows "This is UTF-8 (Telugu)"
+    const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+    
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -111,29 +115,28 @@ function ChatInterface({ roomId, username, onLeave }) {
     a.click();
   };
 
-  // 🔗 INVITE FUNCTION (Copy Link)
-  const handleInvite = () => {
-    const url = window.location.href; // Copies current URL
-    navigator.clipboard.writeText(url);
-    alert("SECURE LINK COPIED TO CLIPBOARD.\nSend this to your operatives.");
+  const handleNuke = async () => {
+    if (!window.confirm("WARNING: RADIOLOGICAL HAZARD.\nThis will erase everything.")) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/chat/nuke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_id: roomId })
+      });
+      setMessages([]); 
+    } catch (err) {
+      alert("NUKE FAILED");
+    }
   };
 
-  const toggleMic = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) alert("Microphone active (Simulation Mode)");
-  };
-
-  // --- RENDER VISUALS ---
   const renderMessageContent = (msgContent) => {
     if (msgContent.includes('```mermaid')) {
       const parts = msgContent.split('```mermaid');
-      const introText = parts[0];
-      const chartCode = parts[1].split('```')[0];
       return (
         <div>
-          <div style={{ whiteSpace: 'pre-wrap' }}>{introText}</div>
+          <div style={{ whiteSpace: 'pre-wrap' }}>{parts[0]}</div>
           <div className="diagram-container">
-            <Mermaid chart={chartCode} />
+            <Mermaid chart={parts[1].split('```')[0]} />
           </div>
         </div>
       );
@@ -143,20 +146,32 @@ function ChatInterface({ roomId, username, onLeave }) {
 
   return (
     <div className="chat-container">
-      {/* HEADER RESTORED */}
+      {/* HEADER */}
       <div className="chat-header">
         <div className="header-title">
-          <span className="status-dot"></span> WAR ROOM: <span className="highlight">{username.split('@')[0]}</span>
+           WAR ROOM: <span className="highlight">{username.split('@')[0]}</span>
         </div>
+        
+        {/* NEW LANGUAGE SELECTOR */}
+        <select 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value)}
+            className="lang-select"
+        >
+            <option value="English">English</option>
+            <option value="Telugu">Telugu (తెలుగు)</option>
+            <option value="Hinglish">Hinglish</option>
+        </select>
+
         <div className="header-controls">
-           <button className="nav-btn" onClick={handleInvite} title="Invite Operative">🔗 INVITE</button>
-           <button className="nav-btn" onClick={handleSave} title="Save Log">💾</button>
+           <button className="nav-btn" onClick={handlePrintPDF} title="Save as PDF">📄 PDF</button>
+           <button className="nav-btn" onClick={handleSaveTxt} title="Save Text">💾 TXT</button>
            <button className="nav-btn" onClick={handleNuke} title="Wipe Memory">☢️</button>
-           <button className="nav-btn" onClick={onLeave} style={{marginLeft: '15px'}}>🔴 EXIT</button>
+           <button className="nav-btn" onClick={onLeave} style={{marginLeft: '10px'}}>🔴</button>
         </div>
       </div>
 
-      <div className="chat-window">
+      <div className="chat-window" ref={chatWindowRef}>
         {messages.map((msg, index) => (
           <div key={index} className={`message-row ${msg.is_ai || msg.sender_name === 'Reality Circuit' ? 'ai-row' : 'user-row'}`}>
             <div className={`message-bubble ${msg.is_ai || msg.sender_name === 'Reality Circuit' ? 'ai-bubble' : 'user-bubble'}`}>
@@ -173,7 +188,7 @@ function ChatInterface({ roomId, username, onLeave }) {
             </div>
           </div>
         ))}
-        {loading && <div className="loading-indicator">⚡ PROCESSING STRATEGY...</div>}
+        {loading && <div className="loading-indicator">⚡ STRATEGY GENERATING...</div>}
         <div ref={messagesEndRef} />
       </div>
 
@@ -183,9 +198,6 @@ function ChatInterface({ roomId, username, onLeave }) {
            <label className="tool-btn">
              📎 <input type="file" hidden onChange={(e) => setFile(e.target.files[0])} />
            </label>
-           <button className={`tool-btn ${isRecording ? 'active-mic' : ''}`} onClick={toggleMic}>
-             🎙️
-           </button>
         </div>
         
         <div className="input-wrapper">
@@ -193,7 +205,7 @@ function ChatInterface({ roomId, username, onLeave }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type command or use Mic..."
+            placeholder={`Command in ${language}...`}
           />
           <button className="send-btn" onClick={handleSend}>SEND</button>
         </div>

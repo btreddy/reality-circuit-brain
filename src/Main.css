@@ -524,3 +524,46 @@ li {
   width: 300px;
   border-radius: 8px;
 }
+/* Language Dropdown */
+.lang-select {
+  background: black;
+  color: #00ff41;
+  border: 1px solid #00ff41;
+  padding: 5px;
+  margin-left: 15px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+}
+
+/* PRINT STYLES (Clean PDF) */
+@media print {
+  body {
+    background: white; /* Save ink */
+    color: black;
+  }
+  .chat-container {
+    height: auto;
+    overflow: visible;
+  }
+  .chat-window {
+    overflow: visible;
+    height: auto;
+  }
+  .message-bubble {
+    border: 1px solid #333;
+    color: black;
+    box-shadow: none;
+  }
+  .ai-bubble {
+    background: #f0f0f0; /* Light gray for AI */
+  }
+  /* Hide tools when printing */
+  .input-area, .header-controls, .nav-btn, .logo, .login-link-btn {
+    display: none !important;
+  }
+  /* Make text readable */
+  .msg-content {
+    font-size: 12pt;
+    font-family: Arial, sans-serif; /* Better for reading */
+  }
+}
