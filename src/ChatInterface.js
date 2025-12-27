@@ -10,10 +10,9 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
   const [language, setLanguage] = useState('English');
-  const [isRecording, setIsRecording] = useState(false); // <--- RESTORED STATE
+  const [isRecording, setIsRecording] = useState(false);
   
   const messagesEndRef = useRef(null);
-  const chatWindowRef = useRef(null);
 
   // --- CORE FUNCTIONS ---
 
@@ -21,12 +20,10 @@ function ChatInterface({ roomId, username, onLeave }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
-      
       setMessages(prev => {
         if (prev.length !== data.length) return data;
         return prev; 
       });
-
     } catch (err) {
       console.error("History fetch error:", err);
     }
@@ -42,11 +39,34 @@ function ChatInterface({ roomId, username, onLeave }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  // --- VOICE LOGIC (TEXT-TO-SPEECH) 🔊 ---
+  const handleSpeak = (text) => {
+    window.speechSynthesis.cancel(); // Stop any current speech
+    
+    // Clean text (remove formatting like * or #)
+    const cleanText = text.replace(/[*#]/g, '');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    // Smart Language Detection
+    if (language === 'Telugu') {
+        utterance.lang = 'te-IN'; // Telugu India
+    } else if (language === 'Hinglish') {
+        utterance.lang = 'hi-IN'; // Hindi India
+    } else {
+        utterance.lang = 'en-US'; // English
+    }
+    
+    utterance.rate = 1; // Normal speed
+    utterance.pitch = 1;
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
   // --- BUTTON HANDLERS ---
 
   const handleSend = async () => {
     if (!input.trim() && !file) return;
-
     const userMsg = input;
     setInput('');
     setLoading(true);
@@ -78,13 +98,11 @@ function ChatInterface({ roomId, username, onLeave }) {
         file_type: fType,
         language: language
       };
-
       await fetch(`${API_BASE_URL}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
       fetchHistory(); 
     } catch (err) {
       console.error("Send error:", err);
@@ -92,16 +110,12 @@ function ChatInterface({ roomId, username, onLeave }) {
     setLoading(false);
   };
 
-  // 🎙️ MIC FUNCTION (RESTORED)
   const toggleMic = () => {
     setIsRecording(!isRecording);
-    // Note: For real speech-to-text, you would connect the Web Speech API here.
     if (!isRecording) alert("Microphone Activated (Ready for Voice Logic)");
   };
 
-  const handlePrintPDF = () => {
-    window.print(); 
-  };
+  const handlePrintPDF = () => window.print();
 
   const handleSaveTxt = () => {
     const text = messages.map(m => `[${m.sender_name}]: ${m.message}`).join('\n\n');
@@ -109,7 +123,7 @@ function ChatInterface({ roomId, username, onLeave }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `WAR_ROOM_LOG_${new Date().toISOString().slice(0,10)}.txt`;
+    a.download = `WAR_ROOM_LOG.txt`;
     a.click();
   };
 
@@ -122,9 +136,7 @@ function ChatInterface({ roomId, username, onLeave }) {
         body: JSON.stringify({ room_id: roomId })
       });
       setMessages([]); 
-    } catch (err) {
-      alert("NUKE FAILED");
-    }
+    } catch (err) { alert("NUKE FAILED"); }
   };
 
   const renderMessageContent = (msgContent) => {
@@ -133,9 +145,7 @@ function ChatInterface({ roomId, username, onLeave }) {
       return (
         <div>
           <div style={{ whiteSpace: 'pre-wrap' }}>{parts[0]}</div>
-          <div className="diagram-container">
-            <Mermaid chart={parts[1].split('```')[0]} />
-          </div>
+          <div className="diagram-container"><Mermaid chart={parts[1].split('```')[0]} /></div>
         </div>
       );
     }
@@ -144,44 +154,40 @@ function ChatInterface({ roomId, username, onLeave }) {
 
   return (
     <div className="chat-container">
-      {/* HEADER */}
       <div className="chat-header">
-        <div className="header-title">
-           WAR ROOM: <span className="highlight">{username.split('@')[0]}</span>
-        </div>
-        
-        <select 
-            value={language} 
-            onChange={(e) => setLanguage(e.target.value)}
-            className="lang-select"
-        >
+        <div className="header-title">WAR ROOM: <span className="highlight">{username.split('@')[0]}</span></div>
+        <select value={language} onChange={(e) => setLanguage(e.target.value)} className="lang-select">
             <option value="English">English</option>
             <option value="Telugu">Telugu (తెలుగు)</option>
             <option value="Hinglish">Hinglish</option>
         </select>
-
         <div className="header-controls">
-           <button className="nav-btn" onClick={handlePrintPDF} title="Save as PDF">📄 PDF</button>
-           <button className="nav-btn" onClick={handleSaveTxt} title="Save Text">💾 TXT</button>
-           <button className="nav-btn" onClick={handleNuke} title="Wipe Memory">☢️</button>
+           <button className="nav-btn" onClick={handlePrintPDF}>📄 PDF</button>
+           <button className="nav-btn" onClick={handleSaveTxt}>💾 TXT</button>
+           <button className="nav-btn" onClick={handleNuke}>☢️</button>
            <button className="nav-btn" onClick={onLeave} style={{marginLeft: '10px'}}>🔴</button>
         </div>
       </div>
 
-      <div className="chat-window" ref={chatWindowRef}>
+      <div className="chat-window">
         {messages.map((msg, index) => (
           <div key={index} className={`message-row ${msg.is_ai || msg.sender_name === 'Reality Circuit' ? 'ai-row' : 'user-row'}`}>
             <div className={`message-bubble ${msg.is_ai || msg.sender_name === 'Reality Circuit' ? 'ai-bubble' : 'user-bubble'}`}>
               <div className="msg-sender">
-                {msg.sender_name} 
-                {msg.is_ai && " ⚡"}
+                {msg.sender_name} {msg.is_ai && " ⚡"}
+                
+                {/* 🔊 SPEAKER BUTTON IS BACK! */}
+                <button 
+                  className="speak-btn" 
+                  onClick={() => handleSpeak(msg.message)}
+                  title="Read Aloud"
+                >
+                  🔊
+                </button>
+
               </div>
-              <div className="msg-content">
-                {renderMessageContent(msg.message)}
-              </div>
-              <div className="msg-time">
-                {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
-              </div>
+              <div className="msg-content">{renderMessageContent(msg.message)}</div>
+              <div className="msg-time">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}</div>
             </div>
           </div>
         ))}
@@ -192,23 +198,11 @@ function ChatInterface({ roomId, username, onLeave }) {
       <div className="input-area">
         <div className="toolbar">
            {file ? <span className="file-badge">📎 {file.name}</span> : null}
-           <label className="tool-btn">
-             📎 <input type="file" hidden onChange={(e) => setFile(e.target.files[0])} />
-           </label>
-           
-           {/* 🎙️ MIC BUTTON IS BACK HERE */}
-           <button className={`tool-btn ${isRecording ? 'active-mic' : ''}`} onClick={toggleMic}>
-             🎙️
-           </button>
+           <label className="tool-btn">📎 <input type="file" hidden onChange={(e) => setFile(e.target.files[0])} /></label>
+           <button className={`tool-btn ${isRecording ? 'active-mic' : ''}`} onClick={toggleMic}>🎙️</button>
         </div>
-        
         <div className="input-wrapper">
-          <input 
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={`Command in ${language}...`}
-          />
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder={`Command in ${language}...`} />
           <button className="send-btn" onClick={handleSend}>SEND</button>
         </div>
       </div>
