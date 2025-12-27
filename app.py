@@ -47,7 +47,7 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
-        # --- NEW MASTER PROMPT WITH DRAWING CAPABILITY ---
+        # CORRECTED PROMPT (Doubled Braces {{ }} for Python safety)
         master_prompt = f"""
         You are a high-level Strategic Advisor in a "War Room".
         
@@ -63,7 +63,7 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
         Here is the visual plan:
         ```mermaid
         graph TD
-          A[Start] --> B{Decision}
+          A[Start] --> B{{Decision}}  
           B -->|Yes| C[Action]
           B -->|No| D[Stop]
         ```

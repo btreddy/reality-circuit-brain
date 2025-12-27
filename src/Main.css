@@ -186,15 +186,30 @@ body {
 }
 .action-btn:hover { background: #00ff41; color: #000; }
 
-.input-wrapper { display: flex; gap: 10px; }
-.chat-input {
-  flex: 1;
-  background: #000;
-  border: 1px solid #005500;
+/* FIX: Make the Input Area Wide and Comfortable */
+.input-wrapper {
+  display: flex;
+  gap: 10px;
+  background: black;
+  border: 1px solid #333;
+  padding: 10px;
+  border-radius: 5px;
+  flex-grow: 1; /* Takes up all available space */
+}
+
+.input-wrapper input {
+  flex-grow: 1; /* Forces the text box to stretch */
+  background: transparent;
+  border: none;
   color: #00ff41;
-  padding: 15px;
-  font-family: 'Courier New';
+  font-family: 'Courier New', Courier, monospace;
   font-size: 1rem;
+  outline: none;
+  width: 100%; /* Ensures it fills the container */
+}
+
+.input-wrapper input::placeholder {
+  color: #005f16;
 }
 .chat-input:focus { border-color: #00ff41; outline: none; }
 .send-btn {
