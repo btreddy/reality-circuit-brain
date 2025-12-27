@@ -42,45 +42,43 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# --- AI ENGINE WITH CONTEXT MEMORY ---
+# --- AI ENGINE WITH CONTEXT MEMORY & VISUALS ---
 def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
-       # ... inside generate_smart_content function ...
+        # --- NEW MASTER PROMPT WITH DRAWING CAPABILITY ---
+        master_prompt = f"""
+        You are a high-level Strategic Advisor in a "War Room".
+        
+        --- VISUAL CAPABILITY UNLOCKED (CRITICAL) ---
+        If the user asks for a Plan, Flowchart, Process, Funnel, or Structure, you MUST provide a Mermaid.js diagram.
+        
+        RULES FOR DIAGRAMS:
+        1. Use 'graph TD' (Top Down) or 'mindmap'.
+        2. Wrap the code in ```mermaid ... ``` blocks.
+        3. Keep labels short and punchy.
+        
+        Example Output format:
+        Here is the visual plan:
+        ```mermaid
+        graph TD
+          A[Start] --> B{Decision}
+          B -->|Yes| C[Action]
+          B -->|No| D[Stop]
+        ```
 
-    # REPLACE THE OLD PROMPT WITH THIS NEW "VISUAL + MEMORY" PROMPT:
-    master_prompt = f"""
-    You are a high-level Strategic Advisor in a "War Room".
-    
-    --- VISUAL CAPABILITY UNLOCKED (CRITICAL) ---
-    If the user asks for a Plan, Flowchart, Process, Funnel, or Structure, you MUST provide a Mermaid.js diagram.
-    
-    RULES FOR DIAGRAMS:
-    1. Use 'graph TD' (Top Down) or 'mindmap'.
-    2. Wrap the code in ```mermaid ... ``` blocks.
-    3. Keep labels short and punchy.
-    
-    Example Output format:
-    Here is the visual plan:
-    ```mermaid
-    graph TD
-      A[Start] --> B{Decision}
-      B -->|Yes| C[Action]
-      B -->|No| D[Stop]
-    ```
-
-    --- CONTEXT / PREVIOUS CHAT HISTORY ---
-    {history_context}
-    ---------------------------------------
-    
-    USER REQUEST: {current_prompt}
-    
-    INSTRUCTIONS:
-    1. Use the Context above to understand the project.
-    2. Be direct, tactical, and actionable. No fluff.
-    3. If the request implies a visual structure (like "map this out"), use the Mermaid format above.
-    """
+        --- CONTEXT / PREVIOUS CHAT HISTORY ---
+        {history_context}
+        ---------------------------------------
+        
+        USER REQUEST: {current_prompt}
+        
+        INSTRUCTIONS:
+        1. Use the Context above to understand the project.
+        2. Be direct, tactical, and actionable. No fluff.
+        3. If the request implies a visual structure (like "map this out"), use the Mermaid format above.
+        """
 
         content_parts = [master_prompt]
         
@@ -204,7 +202,6 @@ def send_chat():
     ai_reply = None
     
     if should_reply:
-        # A. Clean the prompt
         clean_prompt = message
         for t in triggers:
             clean_prompt = clean_prompt.replace(t, "").replace(t.upper(), "").replace(t.capitalize(), "")
@@ -213,10 +210,8 @@ def send_chat():
             clean_prompt = "Hello, I am listening. What is the status?"
 
         # B. FETCH HISTORY (THE MEMORY FIX) 🧠
-        # Get last 15 messages to give context
         cur.execute("SELECT sender_name, message FROM room_chats WHERE room_id = %s ORDER BY timestamp DESC LIMIT 15", (room_id,))
         rows = cur.fetchall()
-        # Reverse them so they are in chronological order (Old -> New)
         history_rows = rows[::-1] 
         
         history_text = ""
