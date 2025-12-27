@@ -9,10 +9,11 @@ function ChatInterface({ roomId, username, onLeave }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
-  const [language, setLanguage] = useState('English'); // Default Language
+  const [language, setLanguage] = useState('English');
+  const [isRecording, setIsRecording] = useState(false); // <--- RESTORED STATE
   
   const messagesEndRef = useRef(null);
-  const chatWindowRef = useRef(null); // Ref for scroll control
+  const chatWindowRef = useRef(null);
 
   // --- CORE FUNCTIONS ---
 
@@ -21,11 +22,8 @@ function ChatInterface({ roomId, username, onLeave }) {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
       const data = await res.json();
       
-      // SMART SCROLL FIX: Only update if we actually have new messages
       setMessages(prev => {
-        if (prev.length !== data.length) {
-          return data;
-        }
+        if (prev.length !== data.length) return data;
         return prev; 
       });
 
@@ -40,7 +38,6 @@ function ChatInterface({ roomId, username, onLeave }) {
     return () => clearInterval(interval);
   }, [fetchHistory]);
 
-  // SCROLL LOGIC: Only scroll when message count changes (Prevents jumping while reading)
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
@@ -79,7 +76,7 @@ function ChatInterface({ roomId, username, onLeave }) {
         message: msg,
         file_data: fData,
         file_type: fType,
-        language: language // <--- SEND CHOSEN LANGUAGE
+        language: language
       };
 
       await fetch(`${API_BASE_URL}/api/chat/send`, {
@@ -95,19 +92,20 @@ function ChatInterface({ roomId, username, onLeave }) {
     setLoading(false);
   };
 
-  // 📄 PDF FUNCTION (Uses Native Print)
+  // 🎙️ MIC FUNCTION (RESTORED)
+  const toggleMic = () => {
+    setIsRecording(!isRecording);
+    // Note: For real speech-to-text, you would connect the Web Speech API here.
+    if (!isRecording) alert("Microphone Activated (Ready for Voice Logic)");
+  };
+
   const handlePrintPDF = () => {
-    // We create a temporary print view
     window.print(); 
   };
 
-  // 💾 SAVE TXT FUNCTION (Fixed for Telugu)
   const handleSaveTxt = () => {
     const text = messages.map(m => `[${m.sender_name}]: ${m.message}`).join('\n\n');
-    
-    // THE SECRET SAUCE: \uFEFF is the Byte Order Mark that tells Windows "This is UTF-8 (Telugu)"
     const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
-    
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -152,7 +150,6 @@ function ChatInterface({ roomId, username, onLeave }) {
            WAR ROOM: <span className="highlight">{username.split('@')[0]}</span>
         </div>
         
-        {/* NEW LANGUAGE SELECTOR */}
         <select 
             value={language} 
             onChange={(e) => setLanguage(e.target.value)}
@@ -198,6 +195,11 @@ function ChatInterface({ roomId, username, onLeave }) {
            <label className="tool-btn">
              📎 <input type="file" hidden onChange={(e) => setFile(e.target.files[0])} />
            </label>
+           
+           {/* 🎙️ MIC BUTTON IS BACK HERE */}
+           <button className={`tool-btn ${isRecording ? 'active-mic' : ''}`} onClick={toggleMic}>
+             🎙️
+           </button>
         </div>
         
         <div className="input-wrapper">
