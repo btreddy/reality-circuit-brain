@@ -579,4 +579,31 @@ li {
 .speak-btn:hover {
   opacity: 1;
   transform: scale(1.2);
+}/* Quick Actions Container */
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: 20px; /* Separates them from Mic/Clip */
+  padding-left: 20px;
+  border-left: 1px solid #333; /* Divider line */
+}
+
+/* The Plan/Risks/Ideas Buttons */
+.action-btn {
+  background: #111;
+  border: 1px solid #00ff41;
+  color: #00ff41;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: #00ff41;
+  color: black;
+  font-weight: bold;
+  box-shadow: 0 0 10px #00ff41;
 }
