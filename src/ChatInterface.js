@@ -16,7 +16,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   // 1. Fetch History on Load
   useEffect(() => {
     fetchHistory();
-    const interval = setInterval(fetchHistory, 5000); // Poll every 5s for sync
+    const interval = setInterval(fetchHistory, 10000); // Poll every 5s for sync
     return () => clearInterval(interval);
   }, []);
 
