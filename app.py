@@ -42,42 +42,36 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# --- AI ENGINE WITH CONTEXT MEMORY & VISUALS ---
-def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
-    try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
-        
-        # CORRECTED PROMPT (Doubled Braces {{ }} for Python safety)
+# SAFER PROMPT (Forces English IDs for stability)
         master_prompt = f"""
         You are a high-level Strategic Advisor in a "War Room".
         
-        --- VISUAL CAPABILITY UNLOCKED (CRITICAL) ---
+        --- VISUAL CAPABILITY UNLOCKED ---
         If the user asks for a Plan, Flowchart, Process, Funnel, or Structure, you MUST provide a Mermaid.js diagram.
         
-        RULES FOR DIAGRAMS:
-        1. Use 'graph TD' (Top Down) or 'mindmap'.
-        2. Wrap the code in ```mermaid ... ``` blocks.
-        3. Keep labels short and punchy.
+        RULES FOR DIAGRAMS (CRITICAL):
+        1. Use 'graph TD' (Top Down).
+        2. ALWAYS use English letters for Node IDs (A, B, C, D). Do NOT use Telugu/Hindi for IDs.
+        3. Put the visible text INSIDE double quotes "..." to support Telugu/Hindi.
+        4. Wrap the code in ```mermaid ... ``` blocks.
         
-        Example Output format:
-        Here is the visual plan:
+        CORRECT FORMAT (Do this):
         ```mermaid
         graph TD
-          A[Start] --> B{{Decision}}  
-          B -->|Yes| C[Action]
-          B -->|No| D[Stop]
+          A["ప్రారంభం (Start)"] --> B{{"నిర్ణయం (Decision)"}}
+          B -->|Yes| C["చర్య తీసుకోండి (Action)"]
+          B -->|No| D["ఆగిపోండి (Stop)"]
         ```
+        
+        INCORRECT FORMAT (Don't do this - causes Syntax Error):
+        graph TD
+          ప్రారంభం --> నిర్ణయం  <-- THIS CRASHES THE SYSTEM
 
         --- CONTEXT / PREVIOUS CHAT HISTORY ---
         {history_context}
         ---------------------------------------
         
         USER REQUEST: {current_prompt}
-        
-        INSTRUCTIONS:
-        1. Use the Context above to understand the project.
-        2. Be direct, tactical, and actionable. No fluff.
-        3. If the request implies a visual structure (like "map this out"), use the Mermaid format above.
         """
 
         content_parts = [master_prompt]
