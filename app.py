@@ -39,14 +39,11 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# --- AI ENGINE WITH SYNTAX-SAFE PROMPTS ---
+# --- AI ENGINE ---
 def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
-        # --- MASTER PROMPT: ESCAPED BRACES FIX ---
-        # Note: We use {{ }} for Mermaid examples so Python doesn't crash.
-        # We use {variable} for actual Python variables.
         master_prompt = f"""
         You are a high-level Strategic Advisor in a "War Room".
         
@@ -83,7 +80,6 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
         """
 
         content_parts = [master_prompt]
-        
         if file_data and file_type:
             file_bytes = base64.b64decode(file_data)
             file_stream = BytesIO(file_bytes)
@@ -187,10 +183,35 @@ def get_history():
     room_id = request.args.get('room_id')
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT sender_name, message, is_ai FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
+    cur.execute("SELECT sender_name, message, is_ai, timestamp FROM room_chats WHERE room_id = %s ORDER BY timestamp ASC", (room_id,))
     messages = cur.fetchall()
     cur.close(); conn.close()
     return jsonify(messages)
+
+# --- NEW: IMPORT FEATURE ---
+@app.route('/api/chat/import', methods=['POST'])
+def import_chat():
+    data = request.json
+    room_id = data.get('room_id')
+    history = data.get('history', []) # Expects a list of message objects
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 1. Clear current memory? (Optional - let's just append for safety)
+        # Un-comment the next line if you want Import to REPLACE everything instead of adding to it.
+        # cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
+        
+        # 2. Insert Old Messages
+        for msg in history:
+            cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai, timestamp) VALUES (%s, %s, %s, %s, %s)", 
+                        (room_id, msg.get('sender_name'), msg.get('message'), msg.get('is_ai'), msg.get('timestamp')))
+        
+        conn.commit(); cur.close(); conn.close()
+        return jsonify({"status": "IMPORTED"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/chat/nuke', methods=['POST'])
 def nuke_chat():

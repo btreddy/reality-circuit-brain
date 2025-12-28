@@ -6,7 +6,7 @@ const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState(''); // Text in the box
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
   const [language, setLanguage] = useState('English');
@@ -91,35 +91,23 @@ function ChatInterface({ roomId, username, onLeave }) {
     }
   };
 
-  // --- 4. QUICK ACTIONS (FIXED: FILLS INPUT) ---
   const handleQuickAction = (type) => {
-    // We add "@ai" so the Brain knows to reply!
     let text = "";
     if (type === 'PLAN') text = "@ai Create a detailed Strategic Plan (with Flowchart).";
     if (type === 'RISKS') text = "@ai Analyze Risks and Pitfalls for this plan.";
     if (type === 'IDEAS') text = "@ai Brainstorm 5 innovative Ideas.";
-    
-    setInput(text); // <--- This puts the text in the box so you can hit SEND
+    setInput(text); 
   };
 
-  // --- 5. SMART SPEAKER (FALLBACK LOGIC) ---
   const handleSpeak = (text) => {
     window.speechSynthesis.cancel();
-    
     const cleanText = text.replace(/[*#`]/g, ''); 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     let selectedVoice = null;
 
-    // VOICE LOGIC
     if (language === 'Telugu') {
-        // 1. Try Telugu
         selectedVoice = availableVoices.find(v => v.lang.includes('te'));
-        
-        // 2. If no Telugu, Try Hindi (Closest sound)
-        if (!selectedVoice) {
-             console.log("Telugu voice missing, trying Hindi...");
-             selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
-        }
+        if (!selectedVoice) selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
     } else if (language === 'Hinglish') {
         selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
     }
@@ -128,12 +116,10 @@ function ChatInterface({ roomId, username, onLeave }) {
         utterance.voice = selectedVoice;
         utterance.lang = selectedVoice.lang;
     } 
-
     utterance.rate = 1;
     window.speechSynthesis.speak(utterance);
   };
 
-  // --- UTILS ---
   const toggleMic = () => {
     setIsRecording(!isRecording);
     if (!isRecording) alert("Microphone Active");
@@ -149,6 +135,43 @@ function ChatInterface({ roomId, username, onLeave }) {
     a.href = url;
     a.download = `WAR_ROOM_LOG.txt`;
     a.click();
+  };
+
+  // --- NEW: BACKUP (JSON) ---
+  const handleBackup = () => {
+    const jsonString = JSON.stringify(messages, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `WAR_ROOM_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+  };
+
+  // --- NEW: RESTORE (JSON) ---
+  const handleRestore = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const history = JSON.parse(e.target.result);
+        
+        // Send to Backend for Bulk Insert
+        await fetch(`${API_BASE_URL}/api/chat/import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ room_id: roomId, history: history })
+        });
+        
+        alert("Session Restored Successfully!");
+        fetchHistory(); // Refresh immediately
+      } catch (err) {
+        alert("Invalid Backup File. Cannot Restore.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleNuke = async () => {
@@ -186,9 +209,18 @@ function ChatInterface({ roomId, username, onLeave }) {
             <option value="Hinglish">Hinglish</option>
         </select>
         <div className="header-controls">
-           <button className="nav-btn" onClick={handlePrintPDF}>📄</button>
-           <button className="nav-btn" onClick={handleSaveTxt}>💾</button>
-           <button className="nav-btn" onClick={handleNuke}>☢️</button>
+           {/* RESTORE BUTTON */}
+           <label className="nav-btn" style={{cursor: 'pointer'}} title="Restore Session">
+             📂
+             <input type="file" hidden accept=".json" onChange={handleRestore} />
+           </label>
+
+           {/* BACKUP BUTTON */}
+           <button className="nav-btn" onClick={handleBackup} title="Backup System (JSON)">📥</button>
+
+           <button className="nav-btn" onClick={handlePrintPDF} title="PDF Report">📄</button>
+           <button className="nav-btn" onClick={handleSaveTxt} title="Save Text">💾</button>
+           <button className="nav-btn" onClick={handleNuke} title="Nuke">☢️</button>
            <button className="nav-btn" onClick={onLeave} style={{marginLeft: '10px'}}>🔴</button>
         </div>
       </div>
