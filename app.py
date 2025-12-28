@@ -39,12 +39,14 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# --- AI ENGINE WITH "ARMORED" DIAGRAMS ---
+# --- AI ENGINE WITH SYNTAX-SAFE PROMPTS ---
 def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
-        # --- MASTER PROMPT: ARMORED MODE ---
+        # --- MASTER PROMPT: ESCAPED BRACES FIX ---
+        # Note: We use {{ }} for Mermaid examples so Python doesn't crash.
+        # We use {variable} for actual Python variables.
         master_prompt = f"""
         You are a high-level Strategic Advisor in a "War Room".
         
@@ -54,17 +56,17 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
         RULES FOR DIAGRAMS (CRITICAL - DO NOT BREAK):
         1. Use 'graph TD' (Top Down).
         2. **ALWAYS QUOTE YOUR LABELS.**
-           - WRONG: A[Start Analysis] --> B{Is it Risky?}
-           - CORRECT: A["Start Analysis"] --> B{"Is it Risky?"}
+           - WRONG: A[Start Analysis] --> B{{Is it Risky?}}
+           - CORRECT: A["Start Analysis"] --> B{{"Is it Risky?"}}
         3. **USE ENGLISH TEXT ONLY inside the diagram.**
-        4. Do NOT use brackets () [] {{}} inside the text unless they are inside quotes "".
+        4. Do NOT use brackets () [] {{{{}}}} inside the text unless they are inside quotes "".
         5. Wrap the code in ```mermaid ... ``` blocks.
         
         Example Output:
         Here is the visual plan:
         ```mermaid
         graph TD
-          A["Start Investment"] --> B{"Check Market?"}
+          A["Start Investment"] --> B{{"Check Market?"}}
           B -->|Yes| C["Buy Reliance (RIL)"]
           B -->|No| D["Wait for Dip"]
         ```
