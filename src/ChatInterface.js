@@ -6,15 +6,26 @@ const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(''); // Text in the box
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
   const [language, setLanguage] = useState('English');
   const [isRecording, setIsRecording] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]); 
   
   const messagesEndRef = useRef(null);
 
-  // --- CORE FUNCTIONS ---
+  // --- 1. VOICE LOADER ---
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setAvailableVoices(voices);
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
+
+  // --- 2. HISTORY SYNC ---
   const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
@@ -36,52 +47,9 @@ function ChatInterface({ roomId, username, onLeave }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // --- VOICE & ACTIONS ---
-  const handleSpeak = (text) => {
-    window.speechSynthesis.cancel();
-    const cleanText = text.replace(/[*#]/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    if (language === 'Telugu') utterance.lang = 'te-IN';
-    else if (language === 'Hinglish') utterance.lang = 'hi-IN';
-    else utterance.lang = 'en-US';
-    window.speechSynthesis.speak(utterance);
-  };
-
-  // ⚡ QUICK ACTIONS (RESTORED)
-  const handleQuickAction = (type) => {
-    let prompt = "";
-    if (type === 'PLAN') prompt = "Create a detailed Strategic Plan (Flowchart included) for the current topic.";
-    if (type === 'RISKS') prompt = "Analyze the Risks, Pitfalls, and potential Failure Points.";
-    if (type === 'IDEAS') prompt = "Brainstorm 5 innovative Ideas and alternative approaches.";
-    
-    sendToBackend(prompt, null, null);
-  };
-
-  // --- SEND LOGIC ---
-  const handleSend = async () => {
-    if (!input.trim() && !file) return;
-    const userMsg = input;
-    setInput('');
-    setLoading(true);
-
-    let fileData = null;
-    let fileType = null;
-
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        fileData = reader.result.split(',')[1];
-        fileType = file.type;
-        await sendToBackend(userMsg, fileData, fileType);
-      };
-      reader.readAsDataURL(file);
-      setFile(null);
-    } else {
-      await sendToBackend(userMsg, null, null);
-    }
-  };
-
+  // --- 3. SEND LOGIC ---
   const sendToBackend = async (msg, fData, fType) => {
+    setLoading(true);
     try {
       const payload = {
         room_id: roomId,
@@ -101,11 +69,76 @@ function ChatInterface({ roomId, username, onLeave }) {
     setLoading(false);
   };
 
-  const toggleMic = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) alert("Microphone Activated");
+  const handleSend = async () => {
+    if (!input.trim() && !file) return;
+    const userMsg = input;
+    setInput('');
+    
+    let fileData = null;
+    let fileType = null;
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        fileData = reader.result.split(',')[1];
+        fileType = file.type;
+        await sendToBackend(userMsg, fileData, fileType);
+      };
+      reader.readAsDataURL(file);
+      setFile(null);
+    } else {
+      await sendToBackend(userMsg, null, null);
+    }
   };
 
+  // --- 4. QUICK ACTIONS (FIXED: FILLS INPUT) ---
+  const handleQuickAction = (type) => {
+    // We add "@ai" so the Brain knows to reply!
+    let text = "";
+    if (type === 'PLAN') text = "@ai Create a detailed Strategic Plan (with Flowchart).";
+    if (type === 'RISKS') text = "@ai Analyze Risks and Pitfalls for this plan.";
+    if (type === 'IDEAS') text = "@ai Brainstorm 5 innovative Ideas.";
+    
+    setInput(text); // <--- This puts the text in the box so you can hit SEND
+  };
+
+  // --- 5. SMART SPEAKER (FALLBACK LOGIC) ---
+  const handleSpeak = (text) => {
+    window.speechSynthesis.cancel();
+    
+    const cleanText = text.replace(/[*#`]/g, ''); 
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    let selectedVoice = null;
+
+    // VOICE LOGIC
+    if (language === 'Telugu') {
+        // 1. Try Telugu
+        selectedVoice = availableVoices.find(v => v.lang.includes('te'));
+        
+        // 2. If no Telugu, Try Hindi (Closest sound)
+        if (!selectedVoice) {
+             console.log("Telugu voice missing, trying Hindi...");
+             selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
+        }
+    } else if (language === 'Hinglish') {
+        selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
+    }
+
+    if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang;
+    } 
+
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // --- UTILS ---
+  const toggleMic = () => {
+    setIsRecording(!isRecording);
+    if (!isRecording) alert("Microphone Active");
+  };
+  
   const handlePrintPDF = () => window.print();
   
   const handleSaveTxt = () => {
@@ -149,7 +182,7 @@ function ChatInterface({ roomId, username, onLeave }) {
         <div className="header-title">WAR ROOM: <span className="highlight">{username.split('@')[0]}</span></div>
         <select value={language} onChange={(e) => setLanguage(e.target.value)} className="lang-select">
             <option value="English">English</option>
-            <option value="Telugu">Telugu</option>
+            <option value="Telugu">Telugu (తెలుగు)</option>
             <option value="Hinglish">Hinglish</option>
         </select>
         <div className="header-controls">
@@ -178,13 +211,11 @@ function ChatInterface({ roomId, username, onLeave }) {
       </div>
 
       <div className="input-area">
-        {/* TOOLBAR with Quick Actions */}
         <div className="toolbar">
            {file ? <span className="file-badge">📎 {file.name}</span> : null}
            <label className="tool-btn">📎 <input type="file" hidden onChange={(e) => setFile(e.target.files[0])} /></label>
            <button className={`tool-btn ${isRecording ? 'active-mic' : ''}`} onClick={toggleMic}>🎙️</button>
            
-           {/* THE 3 MISSING BUTTONS */}
            <div className="quick-actions">
               <button className="action-btn" onClick={() => handleQuickAction('PLAN')}>📋 PLAN</button>
               <button className="action-btn" onClick={() => handleQuickAction('RISKS')}>⚠️ RISKS</button>
