@@ -12,8 +12,6 @@ from docx import Document
 
 # --- CONFIGURATION ---
 app = Flask(__name__, static_folder='build', static_url_path='/')
-
-# 1. ENABLE CORS
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Database Setup
@@ -36,39 +34,39 @@ def init_db():
         cur = conn.cursor()
         cur.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, room_id TEXT NOT NULL, device_id TEXT, message_count INTEGER DEFAULT 0);")
         cur.execute("CREATE TABLE IF NOT EXISTS room_chats (id SERIAL PRIMARY KEY, room_id TEXT NOT NULL, sender_name TEXT NOT NULL, message TEXT NOT NULL, is_ai BOOLEAN DEFAULT FALSE, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-        cur.execute("CREATE TABLE IF NOT EXISTS leads (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, message TEXT NOT NULL, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
         conn.commit(); cur.close(); conn.close()
         print("✅ DATABASE TABLES READY.")
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# --- AI ENGINE WITH HYBRID LOGIC (Telugu Chat / English Diagrams) ---
+# --- AI ENGINE WITH "ARMORED" DIAGRAMS ---
 def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
     try:
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
-        # --- MASTER PROMPT: HYBRID MODE ---
+        # --- MASTER PROMPT: ARMORED MODE ---
         master_prompt = f"""
         You are a high-level Strategic Advisor in a "War Room".
         
         --- VISUAL CAPABILITY UNLOCKED ---
         If the user asks for a Plan, Flowchart, Process, Funnel, or Structure, you MUST provide a Mermaid.js diagram.
         
-        RULES FOR DIAGRAMS (STRICT):
+        RULES FOR DIAGRAMS (CRITICAL - DO NOT BREAK):
         1. Use 'graph TD' (Top Down).
-        2. **ALWAYS use ENGLISH for all Text and Labels inside the diagram.**
-           - Reason: The rendering engine crashes with Telugu/Hindi characters.
-           - Example: Use "Start" instead of "ప్రారంభం".
-        3. Do NOT use special characters inside the mermaid code block.
-        4. Wrap the code in ```mermaid ... ``` blocks.
+        2. **ALWAYS QUOTE YOUR LABELS.**
+           - WRONG: A[Start Analysis] --> B{Is it Risky?}
+           - CORRECT: A["Start Analysis"] --> B{"Is it Risky?"}
+        3. **USE ENGLISH TEXT ONLY inside the diagram.**
+        4. Do NOT use brackets () [] {{}} inside the text unless they are inside quotes "".
+        5. Wrap the code in ```mermaid ... ``` blocks.
         
         Example Output:
-        Here is the plan (Diagram in English for clarity):
+        Here is the visual plan:
         ```mermaid
         graph TD
-          A[Start Campaign] --> B{{Lead Received?}}
-          B -->|Yes| C[Call Customer]
-          B -->|No| D[Retargeting Ad]
+          A["Start Investment"] --> B{"Check Market?"}
+          B -->|Yes| C["Buy Reliance (RIL)"]
+          B -->|No| D["Wait for Dip"]
         ```
 
         --- CONTEXT / PREVIOUS CHAT HISTORY ---
@@ -78,8 +76,8 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
         USER REQUEST: {current_prompt}
         
         INSTRUCTIONS:
-        1. Answer the user's question in the requested language (English/Telugu/Hindi).
-        2. BUT... if you draw a diagram, KEEP THE DIAGRAM TEXT IN ENGLISH.
+        1. Answer in the requested language (English/Telugu).
+        2. Draw diagrams using the STRICT RULES above (English + Quotes).
         """
 
         content_parts = [master_prompt]
@@ -87,26 +85,14 @@ def generate_smart_content(history_context, current_prompt, file_data=None, file
         if file_data and file_type:
             file_bytes = base64.b64decode(file_data)
             file_stream = BytesIO(file_bytes)
-
             if "image" in file_type:
-                image = Image.open(file_stream)
-                content_parts.append(image)
-            
+                content_parts.append(Image.open(file_stream))
             elif "pdf" in file_type:
                 try:
                     reader = PdfReader(file_stream)
                     pdf_text = "\n".join([page.extract_text() for page in reader.pages])
-                    content_parts.append(f"\n[NEW DOCUMENT ATTACHED]:\n{pdf_text}")
-                except:
-                    return "ERROR: Could not read PDF file."
-
-            elif "word" in file_type or "officedocument" in file_type:
-                try:
-                    doc = Document(file_stream)
-                    doc_text = "\n".join([para.text for para in doc.paragraphs])
-                    content_parts.append(f"\n[NEW DOCUMENT ATTACHED]:\n{doc_text}")
-                except:
-                    return "ERROR: Could not read Word file."
+                    content_parts.append(f"\n[PDF]:\n{pdf_text}")
+                except: pass
 
         response = model.generate_content(content_parts)
         return response.text.strip()
@@ -123,8 +109,7 @@ def after_request(response):
 # --- API ROUTES ---
 
 @app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "ONLINE", "brain": "ACTIVE"})
+def health_check(): return jsonify({"status": "ONLINE"})
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -132,47 +117,29 @@ def signup():
     username = data.get('username')
     password = data.get('password')
     device_id = data.get('device_id')
-    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
     cur.execute("SELECT * FROM users WHERE username = %s", (username,))
-    if cur.fetchone():
-        cur.close(); conn.close()
-        return jsonify({"error": "USER ALREADY EXISTS"}), 400
-        
-    cur.execute("SELECT * FROM users WHERE device_id = %s", (device_id,))
-    if cur.fetchone():
-        cur.close(); conn.close()
-        return jsonify({"error": "DEVICE ALREADY REGISTERED"}), 403
-
+    if cur.fetchone(): return jsonify({"error": "USER EXISTS"}), 400
     room_id = username.split('@')[0]
     try:
         cur.execute("INSERT INTO users (username, password, room_id, device_id) VALUES (%s, %s, %s, %s)", (username, password, room_id, device_id))
         conn.commit(); cur.close(); conn.close()
         return jsonify({"username": username, "room_id": room_id})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
-    
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
-        user = cur.fetchone()
-        cur.close(); conn.close()
-
-        if user and user['password'] == password:
-            return jsonify({"username": username, "room_id": user['room_id']})
-        else:
-            return jsonify({"error": "INVALID CREDENTIALS"}), 401
-    except Exception as e:
-        return jsonify({"error": f"DB ERROR: {str(e)}"}), 500
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+    user = cur.fetchone()
+    cur.close(); conn.close()
+    if user and user['password'] == password: return jsonify({"username": username, "room_id": user['room_id']})
+    else: return jsonify({"error": "INVALID CREDENTIALS"}), 401
 
 @app.route('/api/chat/send', methods=['POST'])
 def send_chat():
@@ -182,48 +149,28 @@ def send_chat():
     message = data.get('message', '')
     file_data = data.get('file_data', None)
     file_type = data.get('file_type', None)
-    language = data.get('language', 'English') # GRAB LANGUAGE
+    language = data.get('language', 'English')
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # 1. Save User Message
     display_message = message
-    if file_data:
-        display_message += f" \n[📎 ATTACHMENT: {file_type.split('/')[-1] if file_type else 'FILE'}]"
+    if file_data: display_message += " [📎 FILE]"
 
     cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
                 (room_id, sender_name, display_message, False))
     conn.commit()
     
-    # 2. TRIGGER LOGIC
     triggers = ["@ai", "radar", "system", "computer", "btr", "jarvis"]
-    msg_lower = message.lower()
-    is_triggered = any(t in msg_lower for t in triggers)
-    should_reply = is_triggered or file_data is not None
+    should_reply = any(t in message.lower() for t in triggers) or file_data is not None
     
     ai_reply = None
-    
     if should_reply:
-        clean_prompt = message
-        for t in triggers:
-            clean_prompt = clean_prompt.replace(t, "").replace(t.upper(), "").replace(t.capitalize(), "")
-        clean_prompt = clean_prompt.strip()
-        if not clean_prompt and not file_data:
-            clean_prompt = "Status Report?"
-
-        # B. FETCH HISTORY
         cur.execute("SELECT sender_name, message FROM room_chats WHERE room_id = %s ORDER BY timestamp DESC LIMIT 15", (room_id,))
-        rows = cur.fetchall()
-        history_rows = rows[::-1] 
-        
-        history_text = ""
-        for row in history_rows:
-            history_text += f"{row['sender_name']}: {row['message']}\n"
+        history_rows = cur.fetchall()[::-1]
+        history_text = "\n".join([f"{row['sender_name']}: {row['message']}" for row in history_rows])
 
-        # C. INJECT LANGUAGE INSTRUCTION
-        final_prompt = f"{clean_prompt} \n\n(IMPORTANT: Answer in {language} language. BUT IF YOU DRAW A DIAGRAM, USE ENGLISH TEXT ONLY.)"
-
+        final_prompt = f"{message} \n\n(IMPORTANT: Answer in {language}. DIAGRAMS MUST BE ENGLISH ONLY & QUOTED.)"
         ai_reply = generate_smart_content(history_text, final_prompt, file_data, file_type)
 
         cur.execute("INSERT INTO room_chats (room_id, sender_name, message, is_ai) VALUES (%s, %s, %s, %s)", 
@@ -231,7 +178,6 @@ def send_chat():
         conn.commit()
 
     cur.close(); conn.close()
-    
     return jsonify({"status": "SENT", "ai_reply": ai_reply})
 
 @app.route('/api/chat/history', methods=['GET'])
@@ -247,41 +193,22 @@ def get_history():
 @app.route('/api/chat/nuke', methods=['POST'])
 def nuke_chat():
     data = request.json
-    room_id = data.get('room_id')
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("DELETE FROM room_chats WHERE room_id = %s", (room_id,))
+        cur.execute("DELETE FROM room_chats WHERE room_id = %s", (data.get('room_id'),))
         conn.commit(); cur.close(); conn.close()
         return jsonify({"status": "CLEARED"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/contact', methods=['POST'])
-def save_contact():
-    data = request.json
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO leads (name, email, message) VALUES (%s, %s, %s)", (data['name'], data['email'], data['message']))
-        conn.commit(); cur.close(); conn.close()
-        return jsonify({"status": "OK"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except: return jsonify({"error": "Failed"}), 500
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
     if path != "" and os.path.exists(app.static_folder + '/' + path):
         return send_from_directory(app.static_folder, path)
-    else:
-        if os.path.exists(app.static_folder + '/index.html'):
-            return send_from_directory(app.static_folder, 'index.html')
-        else:
-            return "⚠️ SYSTEM LOADING...", 200
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    with app.app_context():
-        init_db()
+    with app.app_context(): init_db()
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
