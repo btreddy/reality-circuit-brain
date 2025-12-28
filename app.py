@@ -42,36 +42,44 @@ def init_db():
     except Exception as e:
         print(f"⚠️ DB INIT ERROR: {e}")
 
-# SAFER PROMPT (Forces English IDs for stability)
+# --- AI ENGINE WITH HYBRID LOGIC (Telugu Chat / English Diagrams) ---
+def generate_smart_content(history_context, current_prompt, file_data=None, file_type=None):
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        
+        # --- MASTER PROMPT: HYBRID MODE ---
         master_prompt = f"""
         You are a high-level Strategic Advisor in a "War Room".
         
         --- VISUAL CAPABILITY UNLOCKED ---
         If the user asks for a Plan, Flowchart, Process, Funnel, or Structure, you MUST provide a Mermaid.js diagram.
         
-        RULES FOR DIAGRAMS (CRITICAL):
+        RULES FOR DIAGRAMS (STRICT):
         1. Use 'graph TD' (Top Down).
-        2. ALWAYS use English letters for Node IDs (A, B, C, D). Do NOT use Telugu/Hindi for IDs.
-        3. Put the visible text INSIDE double quotes "..." to support Telugu/Hindi.
+        2. **ALWAYS use ENGLISH for all Text and Labels inside the diagram.**
+           - Reason: The rendering engine crashes with Telugu/Hindi characters.
+           - Example: Use "Start" instead of "ప్రారంభం".
+        3. Do NOT use special characters inside the mermaid code block.
         4. Wrap the code in ```mermaid ... ``` blocks.
         
-        CORRECT FORMAT (Do this):
+        Example Output:
+        Here is the plan (Diagram in English for clarity):
         ```mermaid
         graph TD
-          A["ప్రారంభం (Start)"] --> B{{"నిర్ణయం (Decision)"}}
-          B -->|Yes| C["చర్య తీసుకోండి (Action)"]
-          B -->|No| D["ఆగిపోండి (Stop)"]
+          A[Start Campaign] --> B{{Lead Received?}}
+          B -->|Yes| C[Call Customer]
+          B -->|No| D[Retargeting Ad]
         ```
-        
-        INCORRECT FORMAT (Don't do this - causes Syntax Error):
-        graph TD
-          ప్రారంభం --> నిర్ణయం  <-- THIS CRASHES THE SYSTEM
 
         --- CONTEXT / PREVIOUS CHAT HISTORY ---
         {history_context}
         ---------------------------------------
         
         USER REQUEST: {current_prompt}
+        
+        INSTRUCTIONS:
+        1. Answer the user's question in the requested language (English/Telugu/Hindi).
+        2. BUT... if you draw a diagram, KEEP THE DIAGRAM TEXT IN ENGLISH.
         """
 
         content_parts = [master_prompt]
@@ -174,7 +182,7 @@ def send_chat():
     message = data.get('message', '')
     file_data = data.get('file_data', None)
     file_type = data.get('file_type', None)
-    language = data.get('language', 'English') # <--- NEW: Grab Language
+    language = data.get('language', 'English') # GRAB LANGUAGE
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -214,8 +222,7 @@ def send_chat():
             history_text += f"{row['sender_name']}: {row['message']}\n"
 
         # C. INJECT LANGUAGE INSTRUCTION
-        # We append the language instruction directly to the prompt so the AI obeys instantly.
-        final_prompt = f"{clean_prompt} \n\n(IMPORTANT: Answer in {language} language. If Telugu, use clear, professional Telugu script.)"
+        final_prompt = f"{clean_prompt} \n\n(IMPORTANT: Answer in {language} language. BUT IF YOU DRAW A DIAGRAM, USE ENGLISH TEXT ONLY.)"
 
         ai_reply = generate_smart_content(history_text, final_prompt, file_data, file_type)
 
