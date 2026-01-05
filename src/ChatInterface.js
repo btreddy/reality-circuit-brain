@@ -125,6 +125,15 @@ function ChatInterface({ roomId, username, onLeave }) {
     if (!isRecording) alert("Microphone Active");
   };
   
+  // --- 4. EXPORT/IMPORT/SHARE TOOLS ---
+
+  // 🔗 RESTORED SHARE FUNCTION
+  const handleInvite = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    alert("SECURE LINK COPIED TO CLIPBOARD.\nShare this to invite others to this War Room.");
+  };
+
   const handlePrintPDF = () => window.print();
   
   const handleSaveTxt = () => {
@@ -137,7 +146,6 @@ function ChatInterface({ roomId, username, onLeave }) {
     a.click();
   };
 
-  // --- NEW: BACKUP (JSON) ---
   const handleBackup = () => {
     const jsonString = JSON.stringify(messages, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
@@ -148,28 +156,21 @@ function ChatInterface({ roomId, username, onLeave }) {
     a.click();
   };
 
-  // --- NEW: RESTORE (JSON) ---
   const handleRestore = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const history = JSON.parse(e.target.result);
-        
-        // Send to Backend for Bulk Insert
         await fetch(`${API_BASE_URL}/api/chat/import`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ room_id: roomId, history: history })
         });
-        
         alert("Session Restored Successfully!");
-        fetchHistory(); // Refresh immediately
-      } catch (err) {
-        alert("Invalid Backup File. Cannot Restore.");
-      }
+        fetchHistory(); 
+      } catch (err) { alert("Invalid Backup File."); }
     };
     reader.readAsText(file);
   };
@@ -209,15 +210,14 @@ function ChatInterface({ roomId, username, onLeave }) {
             <option value="Hinglish">Hinglish</option>
         </select>
         <div className="header-controls">
-           {/* RESTORE BUTTON */}
-           <label className="nav-btn" style={{cursor: 'pointer'}} title="Restore Session">
-             📂
-             <input type="file" hidden accept=".json" onChange={handleRestore} />
-           </label>
-
-           {/* BACKUP BUTTON */}
+           {/* BACKUP & RESTORE */}
+           <label className="nav-btn" style={{cursor: 'pointer'}} title="Restore Session">📂<input type="file" hidden accept=".json" onChange={handleRestore} /></label>
            <button className="nav-btn" onClick={handleBackup} title="Backup System (JSON)">📥</button>
+           
+           {/* 🔗 RESTORED SHARE BUTTON */}
+           <button className="nav-btn" onClick={handleInvite} title="Share Secure Link">🔗</button>
 
+           {/* EXPORTS & EXIT */}
            <button className="nav-btn" onClick={handlePrintPDF} title="PDF Report">📄</button>
            <button className="nav-btn" onClick={handleSaveTxt} title="Save Text">💾</button>
            <button className="nav-btn" onClick={handleNuke} title="Nuke">☢️</button>
@@ -247,14 +247,12 @@ function ChatInterface({ roomId, username, onLeave }) {
            {file ? <span className="file-badge">📎 {file.name}</span> : null}
            <label className="tool-btn">📎 <input type="file" hidden onChange={(e) => setFile(e.target.files[0])} /></label>
            <button className={`tool-btn ${isRecording ? 'active-mic' : ''}`} onClick={toggleMic}>🎙️</button>
-           
            <div className="quick-actions">
               <button className="action-btn" onClick={() => handleQuickAction('PLAN')}>📋 PLAN</button>
               <button className="action-btn" onClick={() => handleQuickAction('RISKS')}>⚠️ RISKS</button>
               <button className="action-btn" onClick={() => handleQuickAction('IDEAS')}>💡 IDEAS</button>
            </div>
         </div>
-        
         <div className="input-wrapper">
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder={`Command in ${language}...`} />
           <button className="send-btn" onClick={handleSend}>SEND</button>
