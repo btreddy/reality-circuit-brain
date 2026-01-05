@@ -279,3 +279,60 @@ input:focus {
 ::-webkit-scrollbar-track { background: var(--dark-bg); }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #555; }
+/* --- PRINTING RULES (PDF FIX) --- */
+@media print {
+  /* 1. Hide the Interface (Header, Input, Buttons) */
+  .chat-header, 
+  .input-area, 
+  .speak-btn, 
+  .nav-btn,
+  .file-badge,
+  .quick-actions {
+    display: none !important;
+  }
+
+  /* 2. Expand Window to Full Height (No Scrollbars) */
+  body, html, .chat-container, .chat-window {
+    height: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: white !important; /* Save Ink */
+  }
+
+  .chat-window {
+    display: block !important;
+  }
+
+  /* 3. Style Bubbles for Paper/PDF */
+  .message-bubble {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    color: black !important; /* Text to Black */
+    background-color: white !important;
+    page-break-inside: avoid; /* Don't cut a message in half */
+    max-width: 100% !important; /* Use full paper width */
+    margin-bottom: 10px;
+  }
+
+  .user-bubble {
+    background-color: #f0f0f0 !important; /* Light Grey for User */
+    text-align: left; /* Align left for reading */
+  }
+
+  .ai-bubble {
+    background-color: #fff !important;
+    border-color: #000 !important;
+  }
+
+  .msg-sender {
+    color: #000 !important;
+  }
+
+  /* 4. Fix Diagram Printing */
+  .diagram-container {
+    border: 1px solid black;
+    page-break-inside: avoid;
+  }
+}
