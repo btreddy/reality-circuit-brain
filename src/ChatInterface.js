@@ -19,7 +19,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   
   const messagesEndRef = useRef(null);
 
-  // --- 1. VOICE OUTPUT (Speaker) ---
+  // --- 1. VOICE OUTPUT ---
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
@@ -29,19 +29,25 @@ function ChatInterface({ roomId, username, onLeave }) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // --- 2. VOICE INPUT (Microphone Logic) ---
+  // --- 2. VOICE INPUT (ECHO FIX) ---
   useEffect(() => {
     if (!recognition) return;
 
-    recognition.continuous = false; // Stop after one sentence
-    recognition.interimResults = false; 
+    recognition.continuous = false; // Stop after one command
+    recognition.interimResults = false; // STRICTLY NO INTERIM RESULTS
 
     recognition.onstart = () => setIsRecording(true);
     recognition.onend = () => setIsRecording(false);
     
+    // THE FIX: Check for isFinal
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setInput(prev => prev + (prev ? " " : "") + transcript); // Append text
+      const result = event.results[0];
+      
+      // Only type if the browser is SURE it's done
+      if (result.isFinal) {
+          const transcript = result[0].transcript;
+          setInput(prev => prev + (prev ? " " : "") + transcript);
+      }
     };
 
     recognition.onerror = (event) => {
@@ -50,7 +56,7 @@ function ChatInterface({ roomId, username, onLeave }) {
     };
   }, []);
 
-  // Update Mic Language when Dropdown Changes
+  // Update Mic Language
   useEffect(() => {
     if (recognition) {
         if (language === 'Telugu') recognition.lang = 'te-IN';
@@ -61,7 +67,7 @@ function ChatInterface({ roomId, username, onLeave }) {
 
   const toggleMic = () => {
     if (!recognition) {
-        alert("Your browser does not support Voice Input. Try Chrome/Edge.");
+        alert("Browser does not support Voice. Try Chrome.");
         return;
     }
     if (isRecording) recognition.stop();
@@ -145,14 +151,12 @@ function ChatInterface({ roomId, username, onLeave }) {
     const cleanText = text.replace(/[*#`]/g, ''); 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     let selectedVoice = null;
-
     if (language === 'Telugu') {
         selectedVoice = availableVoices.find(v => v.lang.includes('te'));
         if (!selectedVoice) selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
     } else if (language === 'Hinglish') {
         selectedVoice = availableVoices.find(v => v.lang.includes('hi'));
     }
-
     if (selectedVoice) {
         utterance.voice = selectedVoice;
         utterance.lang = selectedVoice.lang;
