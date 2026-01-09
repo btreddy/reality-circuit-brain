@@ -335,4 +335,47 @@ input:focus {
     border: 1px solid black;
     page-break-inside: avoid;
   }
+}/* Login Screen Style Update */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: var(--dark-bg);
+}
+
+.login-box {
+  background: var(--panel-bg);
+  padding: 40px;
+  border: 1px solid var(--neon-green);
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+}
+
+.login-title {
+  color: var(--text-main);
+  margin-bottom: 30px;
+  font-family: 'Courier New', monospace;
+}
+
+.input-group input {
+  width: 100%;
+  margin-bottom: 15px;
+  background: #0d1117;
+  border: 1px solid #333;
+  color: white;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.login-btn {
+  background: var(--neon-green);
+  color: black;
+  border: none;
+  padding: 10px 20px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 6px;
+  width: 100%;
 }

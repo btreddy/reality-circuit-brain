@@ -15,7 +15,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   
   const messagesEndRef = useRef(null);
 
-  // --- 1. VOICE LOADER ---
+  // --- VOICE LOADER ---
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
@@ -25,7 +25,7 @@ function ChatInterface({ roomId, username, onLeave }) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // --- 2. HISTORY SYNC ---
+  // --- HISTORY SYNC ---
   const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
@@ -47,7 +47,7 @@ function ChatInterface({ roomId, username, onLeave }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // --- 3. SEND LOGIC ---
+  // --- SEND LOGIC ---
   const sendToBackend = async (msg, fData, fType) => {
     setLoading(true);
     try {
@@ -73,10 +73,8 @@ function ChatInterface({ roomId, username, onLeave }) {
     if (!input.trim() && !file) return;
     const userMsg = input;
     setInput('');
-    
     let fileData = null;
     let fileType = null;
-
     if (file) {
       const reader = new FileReader();
       reader.onloadend = async () => {
@@ -125,13 +123,12 @@ function ChatInterface({ roomId, username, onLeave }) {
     if (!isRecording) alert("Microphone Active");
   };
   
-  // --- 4. EXPORT/IMPORT/SHARE TOOLS ---
-
-  // 🔗 RESTORED SHARE FUNCTION
+  // --- SHARE LINK FIX (GUEST MODE) ---
   const handleInvite = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
-    alert("SECURE LINK COPIED TO CLIPBOARD.\nShare this to invite others to this War Room.");
+    // Generates a link like: https://careco-pilotai.com/?room=btr
+    const guestLink = `${window.location.origin}/?room=${roomId}`;
+    navigator.clipboard.writeText(guestLink);
+    alert(`GUEST LINK COPIED:\n${guestLink}\n\nAnyone with this link can view the War Room.`);
   };
 
   const handlePrintPDF = () => window.print();
@@ -203,21 +200,16 @@ function ChatInterface({ roomId, username, onLeave }) {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <div className="header-title">WAR ROOM: <span className="highlight">{username.split('@')[0]}</span></div>
+        <div className="header-title">WAR ROOM: <span className="highlight">{roomId}</span></div>
         <select value={language} onChange={(e) => setLanguage(e.target.value)} className="lang-select">
             <option value="English">English</option>
             <option value="Telugu">Telugu (తెలుగు)</option>
             <option value="Hinglish">Hinglish</option>
         </select>
         <div className="header-controls">
-           {/* BACKUP & RESTORE */}
            <label className="nav-btn" style={{cursor: 'pointer'}} title="Restore Session">📂<input type="file" hidden accept=".json" onChange={handleRestore} /></label>
            <button className="nav-btn" onClick={handleBackup} title="Backup System (JSON)">📥</button>
-           
-           {/* 🔗 RESTORED SHARE BUTTON */}
            <button className="nav-btn" onClick={handleInvite} title="Share Secure Link">🔗</button>
-
-           {/* EXPORTS & EXIT */}
            <button className="nav-btn" onClick={handlePrintPDF} title="PDF Report">📄</button>
            <button className="nav-btn" onClick={handleSaveTxt} title="Save Text">💾</button>
            <button className="nav-btn" onClick={handleNuke} title="Nuke">☢️</button>
