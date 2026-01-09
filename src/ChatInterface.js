@@ -4,6 +4,10 @@ import './Main.css';
 
 const API_BASE_URL = "https://reality-circuit-brain.onrender.com";
 
+// --- SPEECH RECOGNITION SETUP ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+
 function ChatInterface({ roomId, username, onLeave }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -15,7 +19,7 @@ function ChatInterface({ roomId, username, onLeave }) {
   
   const messagesEndRef = useRef(null);
 
-  // --- VOICE LOADER ---
+  // --- 1. VOICE OUTPUT (Speaker) ---
   useEffect(() => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
@@ -25,7 +29,46 @@ function ChatInterface({ roomId, username, onLeave }) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // --- HISTORY SYNC ---
+  // --- 2. VOICE INPUT (Microphone Logic) ---
+  useEffect(() => {
+    if (!recognition) return;
+
+    recognition.continuous = false; // Stop after one sentence
+    recognition.interimResults = false; 
+
+    recognition.onstart = () => setIsRecording(true);
+    recognition.onend = () => setIsRecording(false);
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev + (prev ? " " : "") + transcript); // Append text
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Mic Error:", event.error);
+      setIsRecording(false);
+    };
+  }, []);
+
+  // Update Mic Language when Dropdown Changes
+  useEffect(() => {
+    if (recognition) {
+        if (language === 'Telugu') recognition.lang = 'te-IN';
+        else if (language === 'Hinglish') recognition.lang = 'hi-IN';
+        else recognition.lang = 'en-US';
+    }
+  }, [language]);
+
+  const toggleMic = () => {
+    if (!recognition) {
+        alert("Your browser does not support Voice Input. Try Chrome/Edge.");
+        return;
+    }
+    if (isRecording) recognition.stop();
+    else recognition.start();
+  };
+
+  // --- 3. HISTORY SYNC ---
   const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/chat/history?room_id=${roomId}`);
@@ -47,7 +90,7 @@ function ChatInterface({ roomId, username, onLeave }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // --- SEND LOGIC ---
+  // --- 4. SEND LOGIC ---
   const sendToBackend = async (msg, fData, fType) => {
     setLoading(true);
     try {
@@ -117,15 +160,9 @@ function ChatInterface({ roomId, username, onLeave }) {
     utterance.rate = 1;
     window.speechSynthesis.speak(utterance);
   };
-
-  const toggleMic = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) alert("Microphone Active");
-  };
   
-  // --- SHARE LINK FIX (GUEST MODE) ---
+  // --- 5. TOOLS & UTILS ---
   const handleInvite = () => {
-    // Generates a link like: https://careco-pilotai.com/?room=btr
     const guestLink = `${window.location.origin}/?room=${roomId}`;
     navigator.clipboard.writeText(guestLink);
     alert(`GUEST LINK COPIED:\n${guestLink}\n\nAnyone with this link can view the War Room.`);
